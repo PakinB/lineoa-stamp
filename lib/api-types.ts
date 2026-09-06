@@ -113,8 +113,14 @@ export interface HoldResponse {
 
 /** พนักงานคีย์รหัสจอง -> เห็นรายการของให้เลือก */
 export interface HoldLookupResponse {
+  entitlement_id: string;
   customer_name: string | null;
   checkpoint: { slot_no: number; label: string };
   options: Array<{ id: string; name: string }>;
   expires_in_sec: number;
 }
+
+/** พนักงานเลือกของแล้วกดยืนยัน — สิทธิ์ถูกใช้จริงตรงนี้เท่านั้น */
+export type ConfirmResponse =
+  | { ok: true; entitlement_id: string; given: string; card: CardState }
+  | { ok: false; reason: "invalid_or_expired" | "invalid_option" };

@@ -305,3 +305,183 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'claim_id', p_claim_id);
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- ---------------------------------------------------------------------------
+--  7) release_expired_holds — ปลดรหัสจองที่หมดเวลา คืนสิทธิ์ให้ลูกค้า
+--
+--  §4: ถ้าไม่มีใครยืนยันใน 5 นาที สิทธิ์ต้องกลับมาเหมือนเดิม
+--  เรียกจากงานตามเวลาทุก 5 นาที และเรียกซ้ำแบบ lazy ตอน hold ใหม่
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION release_expired_holds() RETURNS int AS $$
+DECLARE v_count int;
+BEGIN
+  UPDATE entitlements
+     SET status = 'available', hold_code = NULL, hold_expires_at = NULL
+   WHERE status = 'holding' AND hold_expires_at <= now();
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ---------------------------------------------------------------------------
+--  8) hold_entitlement — ลูกค้ากด "ใช้สิทธิ์" ที่ร้าน
+--
+--  สำคัญ: นี่คือการ "จอง" เท่านั้น สิทธิ์ยังไม่ถูกใช้จนกว่าพนักงานจะยืนยัน (§4)
+--  ถ้าตัดสิทธิ์ตรงนี้ จะเจอเคสลูกค้ากดเล่นที่บ้านแล้วสิทธิ์หาย ซึ่งแก้ไม่ได้หน้าร้าน
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION hold_entitlement(
+  p_customer_id     uuid,
+  p_entitlement_id  uuid
+) RETURNS jsonb AS $$
+DECLARE
+  v_ent   entitlements%ROWTYPE;
+  v_label text;
+  v_ttl   int;
+  v_code  char(6);
+  v_try   int := 0;
+BEGIN
+  PERFORM release_expired_holds();
+
+  SELECT * INTO v_ent FROM entitlements
+   WHERE id = p_entitlement_id AND customer_id = p_customer_id
+   FOR UPDATE;
+
+  IF v_ent.id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'not_found');
+  END IF;
+
+  IF v_ent.status = 'used' THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'already_used');
+  END IF;
+
+  SELECT label INTO v_label FROM reward_checkpoints WHERE id = v_ent.checkpoint_id;
+
+  -- กดซ้ำระหว่างที่ยังจองอยู่ = คืนรหัสเดิม ไม่ออกรหัสใหม่
+  IF v_ent.status = 'holding' THEN
+    RETURN jsonb_build_object(
+      'ok', true, 'hold_code', trim(v_ent.hold_code),
+      'expires_at', v_ent.hold_expires_at, 'label', v_label);
+  END IF;
+
+  IF v_ent.status <> 'available' THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'not_available');
+  END IF;
+
+  SELECT COALESCE((value->>'hold_ttl_minutes')::int, 5) INTO v_ttl
+    FROM app_settings WHERE key = 'hold_ttl_minutes';
+  v_ttl := COALESCE(v_ttl, 5);
+
+  -- สุ่มรหัส 6 หลักที่ยังไม่ถูกใช้อยู่ (unique index บังคับอีกชั้น)
+  LOOP
+    v_try := v_try + 1;
+    v_code := lpad((floor(random() * 1000000))::int::text, 6, '0');
+    EXIT WHEN NOT EXISTS (
+      SELECT 1 FROM entitlements
+       WHERE status = 'holding' AND hold_code = v_code);
+    IF v_try > 20 THEN
+      RETURN jsonb_build_object('ok', false, 'reason', 'code_generation_failed');
+    END IF;
+  END LOOP;
+
+  UPDATE entitlements
+     SET status = 'holding',
+         hold_code = v_code,
+         hold_expires_at = now() + make_interval(mins => v_ttl)
+   WHERE id = p_entitlement_id;
+
+  RETURN jsonb_build_object(
+    'ok', true, 'hold_code', v_code,
+    'expires_at', now() + make_interval(mins => v_ttl), 'label', v_label);
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ---------------------------------------------------------------------------
+--  9) lookup_hold — พนักงานคีย์รหัสจอง แล้วเห็นรายการของให้เลือก
+--
+--  §2: ลูกค้าไม่ได้เลือกของเอง พนักงานเลือกให้ตามของที่สาขามีจริงในวันนั้น
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION lookup_hold(p_code text) RETURNS jsonb AS $$
+DECLARE
+  v_ent  entitlements%ROWTYPE;
+  v_cp   reward_checkpoints%ROWTYPE;
+  v_opts jsonb;
+  v_name text;
+BEGIN
+  SELECT * INTO v_ent FROM entitlements
+   WHERE hold_code = p_code::char(6)
+     AND status = 'holding' AND hold_expires_at > now();
+
+  IF v_ent.id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'invalid_or_expired');
+  END IF;
+
+  SELECT * INTO v_cp FROM reward_checkpoints WHERE id = v_ent.checkpoint_id;
+  SELECT display_name INTO v_name FROM customers WHERE id = v_ent.customer_id;
+
+  SELECT COALESCE(jsonb_agg(jsonb_build_object('id', id, 'name', name) ORDER BY sort),
+                  '[]'::jsonb)
+    INTO v_opts
+    FROM reward_options
+   WHERE checkpoint_id = v_ent.checkpoint_id AND is_active;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'entitlement_id', v_ent.id,
+    'customer_name', v_name,
+    'checkpoint', jsonb_build_object('slot_no', v_cp.slot_no, 'label', v_cp.label),
+    'options', v_opts,
+    'expires_in_sec', GREATEST(0, EXTRACT(EPOCH FROM (v_ent.hold_expires_at - now()))::int)
+  );
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+
+-- ---------------------------------------------------------------------------
+-- 10) confirm_entitlement — พนักงานเลือกของแล้วกดยืนยัน สิทธิ์ถูกใช้จริงตรงนี้
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION confirm_entitlement(
+  p_code      text,
+  p_option_id uuid,
+  p_branch_id uuid,
+  p_staff_id  uuid
+) RETURNS jsonb AS $$
+DECLARE
+  v_ent  entitlements%ROWTYPE;
+  v_name text;
+BEGIN
+  SELECT * INTO v_ent FROM entitlements
+   WHERE hold_code = p_code::char(6)
+     AND status = 'holding' AND hold_expires_at > now()
+   FOR UPDATE;
+
+  IF v_ent.id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'invalid_or_expired');
+  END IF;
+
+  -- ของที่เลือกต้องเป็นของ checkpoint นี้เท่านั้น
+  -- กันพนักงานเผลอ (หรือตั้งใจ) จ่ายรางวัลใหญ่ให้สิทธิ์ช่อง 5
+  SELECT name INTO v_name FROM reward_options
+   WHERE id = p_option_id AND checkpoint_id = v_ent.checkpoint_id AND is_active;
+
+  IF v_name IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'invalid_option');
+  END IF;
+
+  UPDATE entitlements
+     SET status = 'used',
+         used_at = now(),
+         used_branch_id = p_branch_id,
+         chosen_option_id = p_option_id,
+         confirmed_by = p_staff_id,
+         hold_code = NULL,
+         hold_expires_at = NULL
+   WHERE id = v_ent.id;
+
+  RETURN jsonb_build_object(
+    'ok', true, 'entitlement_id', v_ent.id, 'given', v_name,
+    'card', get_card_state(v_ent.customer_id));
+END;
+$$ LANGUAGE plpgsql;

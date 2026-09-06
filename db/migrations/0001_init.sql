@@ -25,13 +25,10 @@ CREATE TABLE customers (
   line_user_id      text NOT NULL UNIQUE,        -- กุญแจหลัก มาจาก LINE Login
   display_name      text,
   picture_url       text,
-  phone             text,
-  phone_verified_at timestamptz,                 -- ยืนยันตอนรับรางวัลครั้งแรก
   consent_at        timestamptz,                 -- PDPA §13
   blocked_at        timestamptz,                 -- ระงับกรณีพบการทุจริต
   created_at        timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX ix_customers_phone ON customers (phone) WHERE phone IS NOT NULL;
 
 -- -------------------------------------------------------- พนักงาน/สิทธิ์ ---
 CREATE TYPE staff_role AS ENUM ('staff', 'manager', 'owner');
