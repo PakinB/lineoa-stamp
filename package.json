@@ -1,0 +1,29 @@
+{
+  "name": "mala-stamp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f db/migrations/0001_init.sql -f db/migrations/0002_functions.sql",
+    "db:seed": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f db/seed.sql",
+    "db:reset": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' && npm run db:migrate && npm run db:seed"
+  },
+  "dependencies": {
+    "@line/bot-sdk": "^9.5.0",
+    "next": "^15.1.0",
+    "postgres": "^3.4.5",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}
