@@ -337,6 +337,47 @@ POS (อนาคต) ───┘     ในโปรเจกต์เดี�
 
 ---
 
+## 7'. การ deploy — เว็บเดียว โดเมนเดียว
+
+ทั้งระบบเป็น **Next.js โปรเจกต์เดียว deploy ครั้งเดียว** ไม่มีเว็บแยก ไม่มีเซิร์ฟเวอร์เสริม
+
+```
+https://<โดเมน>/            หน้าแรก / LIFF ลูกค้า
+https://<โดเมน>/staff       เว็บพนักงาน (PIN)
+https://<โดเมน>/admin       หน้าเจ้าของ
+https://<โดเมน>/api/...     API ทั้งหมด + LINE webhook
+```
+
+แยกด้วย route group ใน Next.js (`app/(liff)`, `app/(staff)`, `app/(admin)`)
+ไม่ต้องใช้ subdomain — ความปลอดภัยมาจากการตรวจสิทธิ์ ไม่ใช่จากการซ่อน URL
+
+### ที่ที่ต้องไปตั้งค่า มี 5 แห่ง
+
+| # | ที่ | ตั้งอะไร |
+|---|---|---|
+| 1 | ผู้ให้บริการโดเมน | จดโดเมน ชี้ DNS มาที่โฮสติ้ง |
+| 2 | Cloudflare Workers (หรือ Vercel) | deploy โปรเจกต์ + ใส่ env |
+| 3 | Supabase | ฐานข้อมูล + bucket `receipts` เก็บรูปใบเสร็จ |
+| 4 | LINE Developers Console | Messaging API channel + LINE Login channel + LIFF app |
+| 5 | LINE OA Manager | ริชเมนู ข้อความทักทาย ตอบกลับอัตโนมัติ |
+
+ข้อ 5 เป็นงานของคนที่ไม่แตะโค้ด (§14) ส่วนข้อ 4 ควรเป็นของเจ้าของโปรเจกต์คนเดียว
+เพราะมี channel secret
+
+### URL ที่ต้องกรอกข้ามระบบ
+
+| กรอกที่ไหน | ค่า |
+|---|---|
+| LIFF Endpoint URL (ข้อ 4) | `https://<โดเมน>/card` |
+| Webhook URL (ข้อ 4) | `https://<โดเมน>/api/line/webhook` |
+| ปุ่มริชเมนู (ข้อ 5) | `https://liff.line.me/<LIFF_ID>` |
+| ในตัว QR สะสม (สร้างจากโค้ด) | `https://liff.line.me/<LIFF_ID>?t=<รหัส>` |
+
+**ต้องเป็น https ทั้งหมด** LINE ไม่รับ http แม้ตอนพัฒนา — ระหว่างพัฒนาใช้ ngrok
+หรือ Cloudflare Tunnel เปิดพอร์ตออกมาชั่วคราว
+
+---
+
 ## 8. โครงสร้างข้อมูล
 
 13 ตาราง — ดู `db/migrations/0001_init.sql` สำหรับของจริง
