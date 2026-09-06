@@ -120,13 +120,15 @@ DECLARE
   v_card_size int;
   v_new_ents  jsonb;
   v_existing  bigint;
+  v_exist_slot int;
 BEGIN
   -- กันเรียกซ้ำ: กุญแจนี้เคยใช้แล้ว คืนสถานะปัจจุบันโดยไม่ปั๊มเพิ่ม
-  SELECT id INTO v_existing
+  SELECT id, slot_no INTO v_existing, v_exist_slot
     FROM stamp_ledger WHERE idempotency_key = p_idempotency_key;
   IF v_existing IS NOT NULL THEN
     RETURN jsonb_build_object(
       'ok', true, 'duplicate', true, 'stamp_id', v_existing,
+      'stamped_slot', v_exist_slot,
       'new_entitlements', '[]'::jsonb,
       'card', get_card_state(p_customer_id)
     );
@@ -195,6 +197,10 @@ BEGIN
     'ok', true,
     'duplicate', false,
     'stamp_id', v_stamp_id,
+    -- ช่องที่เพิ่งถูกปั๊ม — หน้าเว็บใช้เล่นอนิเมชั่นตรงดวงนี้
+    -- ห้ามให้หน้าเว็บ diff เอาเอง เพราะถ้าเปิดหน้าใหม่จะไม่มีสถานะก่อนหน้าให้เทียบ
+    'stamped_slot', v_slot,
+    'card_completed', (v_slot >= v_card.size),
     'new_entitlements', v_new_ents,
     'card', get_card_state(p_customer_id)
   );
