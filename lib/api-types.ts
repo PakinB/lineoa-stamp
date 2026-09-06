@@ -34,7 +34,7 @@ export interface StampCard {
   slots: CardSlot[];
 }
 
-export type EntitlementStatus = "available" | "holding" | "used" | "voided";
+export type EntitlementStatus = "available" | "used" | "voided";
 
 export interface Entitlement {
   id: string;
@@ -111,25 +111,42 @@ export interface DeliveryClaim {
   }>;
 }
 
-// ---------------------------------------------------------- แลกของรางวัล ----
+// ---------------------------------------------------------- รับของรางวัล ----
 
-/** ลูกค้ากด "ใช้สิทธิ์" -> ได้รหัสจอง ยังไม่ตัดสิทธิ์จนกว่าพนักงานจะยืนยัน */
-export interface HoldResponse {
-  hold_code: string;
+/**
+ * ไม่มีขั้นจอง ไม่มีรหัส 6 หลัก ไม่มี dialog ยืนยัน
+ * พนักงานโชว์ QR -> ลูกค้าสแกน -> แตะเลือกสิทธิ์ -> ใช้เลย
+ * การยืนยันคือการที่พนักงานส่งของให้ ไม่ใช่ปุ่มบนหน้าจอ
+ */
+
+/** พนักงานกด "รับรางวัล" -> ได้ QR ไว้โชว์ */
+export interface RedeemTokenResponse {
+  code: string;
   expires_at: string;
-  label: string;
 }
 
-/** พนักงานคีย์รหัสจอง -> เห็นรายการของให้เลือก */
-export interface HoldLookupResponse {
-  entitlement_id: string;
-  customer_name: string | null;
-  checkpoint: { slot_no: number; label: string };
-  options: Array<{ id: string; name: string }>;
-  expires_in_sec: number;
-}
+/** ลูกค้าสแกน QR ของพนักงาน -> เห็นสิทธิ์ที่ใช้ได้ ยังไม่ตัดอะไร */
+export type RedeemableListResponse =
+  | {
+      ok: true;
+      branch_id: string;
+      entitlements: Array<{
+        entitlement_id: string;
+        label: string;
+        /** ปกติมีตัวเดียว · ของที่เจ้าของปิดไว้ (เช่น โค้กหมด) จะไม่โผล่มาเลย */
+        options: Array<{ id: string; name: string }>;
+      }>;
+    }
+  | { ok: false; reason: "invalid_or_expired" };
 
-/** พนักงานเลือกของแล้วกดยืนยัน — สิทธิ์ถูกใช้จริงตรงนี้เท่านั้น */
-export type ConfirmResponse =
+/** ลูกค้าแตะเลือก -> ใช้สิทธิ์ทันที */
+export type RedeemResponse =
   | { ok: true; entitlement_id: string; given: string; card: CardState }
-  | { ok: false; reason: "invalid_or_expired" | "invalid_option" };
+  | {
+      ok: false;
+      reason:
+        | "invalid_or_expired"
+        | "entitlement_not_available"
+        | "option_required"
+        | "invalid_option";
+    };

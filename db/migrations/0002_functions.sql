@@ -46,7 +46,7 @@ BEGIN
     FROM entitlements e
     JOIN reward_checkpoints c ON c.id = e.checkpoint_id
    WHERE e.customer_id = p_customer_id
-     AND e.status IN ('available', 'holding');
+     AND e.status = 'available';
 
   IF v_card.id IS NULL THEN
     RETURN jsonb_build_object('card', NULL, 'entitlements', v_ents,
@@ -314,180 +314,174 @@ $$ LANGUAGE plpgsql;
 
 
 -- ---------------------------------------------------------------------------
---  7) release_expired_holds — ปลดรหัสจองที่หมดเวลา คืนสิทธิ์ให้ลูกค้า
+--  7) issue_redeem_token — พนักงานกด "รับรางวัล" แล้วโชว์ QR ให้ลูกค้าสแกน
 --
---  §4: ถ้าไม่มีใครยืนยันใน 5 นาที สิทธิ์ต้องกลับมาเหมือนเดิม
---  เรียกจากงานตามเวลาทุก 5 นาที และเรียกซ้ำแบบ lazy ตอน hold ใหม่
+--  ทิศทางเดียวกับตอนสะสมแต้ม: พนักงานโชว์ ลูกค้าสแกน
+--  ลูกค้าจึงไม่ต้องเรียนรู้ท่าใหม่ และเครื่องพนักงานไม่ต้องมีกล้อง
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION release_expired_holds() RETURNS int AS $$
-DECLARE v_count int;
+CREATE OR REPLACE FUNCTION issue_redeem_token(
+  p_branch_id uuid,
+  p_staff_id  uuid,
+  p_code      text
+) RETURNS jsonb AS $$
+DECLARE v_ttl int;
 BEGIN
-  UPDATE entitlements
-     SET status = 'available', hold_code = NULL, hold_expires_at = NULL
-   WHERE status = 'holding' AND hold_expires_at <= now();
-  GET DIAGNOSTICS v_count = ROW_COUNT;
-  RETURN v_count;
+  SELECT COALESCE((value->>'redeem_token_ttl_minutes')::int, 5) INTO v_ttl
+    FROM app_settings WHERE key = 'redeem_token_ttl_minutes';
+
+  INSERT INTO redeem_tokens (code, branch_id, issued_by, expires_at)
+  VALUES (p_code, p_branch_id, p_staff_id,
+          now() + make_interval(mins => COALESCE(v_ttl, 5)));
+
+  RETURN jsonb_build_object('ok', true, 'code', p_code,
+    'expires_at', now() + make_interval(mins => COALESCE(v_ttl, 5)));
 END;
 $$ LANGUAGE plpgsql;
 
 
 -- ---------------------------------------------------------------------------
---  8) hold_entitlement — ลูกค้ากด "ใช้สิทธิ์" ที่ร้าน
+--  8) list_redeemable — ลูกค้าสแกน QR แล้วเห็นสิทธิ์ที่ตัวเองใช้ได้
 --
---  สำคัญ: นี่คือการ "จอง" เท่านั้น สิทธิ์ยังไม่ถูกใช้จนกว่าพนักงานจะยืนยัน (§4)
---  ถ้าตัดสิทธิ์ตรงนี้ จะเจอเคสลูกค้ากดเล่นที่บ้านแล้วสิทธิ์หาย ซึ่งแก้ไม่ได้หน้าร้าน
+--  ยังไม่ตัดอะไร แค่แสดงรายการให้เลือก
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION hold_entitlement(
-  p_customer_id     uuid,
-  p_entitlement_id  uuid
+CREATE OR REPLACE FUNCTION list_redeemable(
+  p_customer_id uuid,
+  p_code        text
 ) RETURNS jsonb AS $$
 DECLARE
-  v_ent   entitlements%ROWTYPE;
-  v_label text;
-  v_ttl   int;
-  v_code  char(6);
-  v_try   int := 0;
+  v_tok  redeem_tokens%ROWTYPE;
+  v_list jsonb;
 BEGIN
-  PERFORM release_expired_holds();
+  SELECT * INTO v_tok FROM redeem_tokens
+   WHERE code = p_code AND status = 'active' AND expires_at > now();
 
-  SELECT * INTO v_ent FROM entitlements
-   WHERE id = p_entitlement_id AND customer_id = p_customer_id
-   FOR UPDATE;
-
-  IF v_ent.id IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'reason', 'not_found');
-  END IF;
-
-  IF v_ent.status = 'used' THEN
-    RETURN jsonb_build_object('ok', false, 'reason', 'already_used');
-  END IF;
-
-  SELECT label INTO v_label FROM reward_checkpoints WHERE id = v_ent.checkpoint_id;
-
-  -- กดซ้ำระหว่างที่ยังจองอยู่ = คืนรหัสเดิม ไม่ออกรหัสใหม่
-  IF v_ent.status = 'holding' THEN
-    RETURN jsonb_build_object(
-      'ok', true, 'hold_code', trim(v_ent.hold_code),
-      'expires_at', v_ent.hold_expires_at, 'label', v_label);
-  END IF;
-
-  IF v_ent.status <> 'available' THEN
-    RETURN jsonb_build_object('ok', false, 'reason', 'not_available');
-  END IF;
-
-  SELECT COALESCE((value->>'hold_ttl_minutes')::int, 5) INTO v_ttl
-    FROM app_settings WHERE key = 'hold_ttl_minutes';
-  v_ttl := COALESCE(v_ttl, 5);
-
-  -- สุ่มรหัส 6 หลักที่ยังไม่ถูกใช้อยู่ (unique index บังคับอีกชั้น)
-  LOOP
-    v_try := v_try + 1;
-    v_code := lpad((floor(random() * 1000000))::int::text, 6, '0');
-    EXIT WHEN NOT EXISTS (
-      SELECT 1 FROM entitlements
-       WHERE status = 'holding' AND hold_code = v_code);
-    IF v_try > 20 THEN
-      RETURN jsonb_build_object('ok', false, 'reason', 'code_generation_failed');
-    END IF;
-  END LOOP;
-
-  UPDATE entitlements
-     SET status = 'holding',
-         hold_code = v_code,
-         hold_expires_at = now() + make_interval(mins => v_ttl)
-   WHERE id = p_entitlement_id;
-
-  RETURN jsonb_build_object(
-    'ok', true, 'hold_code', v_code,
-    'expires_at', now() + make_interval(mins => v_ttl), 'label', v_label);
-END;
-$$ LANGUAGE plpgsql;
-
-
--- ---------------------------------------------------------------------------
---  9) lookup_hold — พนักงานคีย์รหัสจอง แล้วเห็นรายการของให้เลือก
---
---  §2: ลูกค้าไม่ได้เลือกของเอง พนักงานเลือกให้ตามของที่สาขามีจริงในวันนั้น
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION lookup_hold(p_code text) RETURNS jsonb AS $$
-DECLARE
-  v_ent  entitlements%ROWTYPE;
-  v_cp   reward_checkpoints%ROWTYPE;
-  v_opts jsonb;
-  v_name text;
-BEGIN
-  SELECT * INTO v_ent FROM entitlements
-   WHERE hold_code = p_code::char(6)
-     AND status = 'holding' AND hold_expires_at > now();
-
-  IF v_ent.id IS NULL THEN
+  IF v_tok.id IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'invalid_or_expired');
   END IF;
 
-  SELECT * INTO v_cp FROM reward_checkpoints WHERE id = v_ent.checkpoint_id;
-  SELECT display_name INTO v_name FROM customers WHERE id = v_ent.customer_id;
+  -- สิทธิ์ที่ใช้ได้ พร้อมตัวเลือกของแต่ละอัน
+  -- ของที่เจ้าของปิดไว้ในหน้าแอดมิน (เช่น โค้กหมด) จะไม่โผล่มาให้เลือกเลย
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+           'entitlement_id', e.id,
+           'label', c.label,
+           'options', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', o.id, 'name', o.name)
+                                                 ORDER BY o.sort), '[]'::jsonb)
+                         FROM reward_options o
+                        WHERE o.checkpoint_id = c.id AND o.is_active)
+         ) ORDER BY e.created_at), '[]'::jsonb)
+    INTO v_list
+    FROM entitlements e
+    JOIN reward_checkpoints c ON c.id = e.checkpoint_id
+   WHERE e.customer_id = p_customer_id AND e.status = 'available';
 
-  SELECT COALESCE(jsonb_agg(jsonb_build_object('id', id, 'name', name) ORDER BY sort),
-                  '[]'::jsonb)
-    INTO v_opts
-    FROM reward_options
-   WHERE checkpoint_id = v_ent.checkpoint_id AND is_active;
-
-  RETURN jsonb_build_object(
-    'ok', true,
-    'entitlement_id', v_ent.id,
-    'customer_name', v_name,
-    'checkpoint', jsonb_build_object('slot_no', v_cp.slot_no, 'label', v_cp.label),
-    'options', v_opts,
-    'expires_in_sec', GREATEST(0, EXTRACT(EPOCH FROM (v_ent.hold_expires_at - now()))::int)
-  );
+  RETURN jsonb_build_object('ok', true, 'branch_id', v_tok.branch_id,
+                            'entitlements', v_list);
 END;
 $$ LANGUAGE plpgsql STABLE;
 
 
 -- ---------------------------------------------------------------------------
--- 10) confirm_entitlement — พนักงานเลือกของแล้วกดยืนยัน สิทธิ์ถูกใช้จริงตรงนี้
+--  9) redeem_with_token — ลูกค้าเลือกสิทธิ์แล้วใช้เลย ไม่มี dialog ยืนยัน
+--
+--  §4: การยืนยันคือการที่พนักงานส่งของให้ ไม่ใช่ปุ่มบนหน้าจอ
+--  ปลอดภัยเพราะลูกค้าจะมาถึงขั้นนี้ได้ต้องสแกน QR ที่พนักงานเพิ่งกดออก
+--  แปลว่ายืนอยู่หน้าเคาน์เตอร์จริง กดพลาดแก้ได้ด้วย void_redemption()
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION confirm_entitlement(
-  p_code      text,
-  p_option_id uuid,
-  p_branch_id uuid,
-  p_staff_id  uuid
+CREATE OR REPLACE FUNCTION redeem_with_token(
+  p_customer_id    uuid,
+  p_code           text,
+  p_entitlement_id uuid,
+  p_option_id      uuid DEFAULT NULL
 ) RETURNS jsonb AS $$
 DECLARE
-  v_ent  entitlements%ROWTYPE;
-  v_name text;
+  v_tok    redeem_tokens%ROWTYPE;
+  v_ent    entitlements%ROWTYPE;
+  v_opt    uuid;
+  v_given  text;
+  v_n      int;
 BEGIN
-  SELECT * INTO v_ent FROM entitlements
-   WHERE hold_code = p_code::char(6)
-     AND status = 'holding' AND hold_expires_at > now()
-   FOR UPDATE;
+  -- แย่งสิทธิ์ใช้ QR: ล็อกแถวแบบเดียวกับตอนสะสม
+  UPDATE redeem_tokens
+     SET status = 'consumed', consumed_by = p_customer_id, consumed_at = now(),
+         entitlement_id = p_entitlement_id
+   WHERE code = p_code AND status = 'active' AND expires_at > now()
+  RETURNING * INTO v_tok;
 
-  IF v_ent.id IS NULL THEN
+  IF v_tok.id IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'invalid_or_expired');
   END IF;
 
-  -- ของที่เลือกต้องเป็นของ checkpoint นี้เท่านั้น
-  -- กันพนักงานเผลอ (หรือตั้งใจ) จ่ายรางวัลใหญ่ให้สิทธิ์ช่อง 5
-  SELECT name INTO v_name FROM reward_options
-   WHERE id = p_option_id AND checkpoint_id = v_ent.checkpoint_id AND is_active;
+  SELECT * INTO v_ent FROM entitlements
+   WHERE id = p_entitlement_id AND customer_id = p_customer_id
+     AND status = 'available'
+   FOR UPDATE;
 
-  IF v_name IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'reason', 'invalid_option');
+  IF v_ent.id IS NULL THEN
+    RAISE EXCEPTION 'entitlement_not_available'
+      USING ERRCODE = 'check_violation';   -- ม้วนกลับทั้งทรานแซกชัน QR ไม่ถูกใช้
   END IF;
 
-  UPDATE entitlements
-     SET status = 'used',
-         used_at = now(),
-         used_branch_id = p_branch_id,
-         chosen_option_id = p_option_id,
-         confirmed_by = p_staff_id,
-         hold_code = NULL,
-         hold_expires_at = NULL
-   WHERE id = v_ent.id;
+  -- ปกติ checkpoint ละ 1 ตัวเลือก เลือกให้อัตโนมัติ
+  IF p_option_id IS NULL THEN
+    SELECT count(*) INTO v_n FROM reward_options
+     WHERE checkpoint_id = v_ent.checkpoint_id AND is_active;
+    IF v_n <> 1 THEN
+      RAISE EXCEPTION 'option_required' USING ERRCODE = 'check_violation';
+    END IF;
+    SELECT id INTO v_opt FROM reward_options
+     WHERE checkpoint_id = v_ent.checkpoint_id AND is_active;
+  ELSE
+    SELECT id INTO v_opt FROM reward_options
+     WHERE id = p_option_id AND checkpoint_id = v_ent.checkpoint_id AND is_active;
+    IF v_opt IS NULL THEN
+      RAISE EXCEPTION 'invalid_option' USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
 
-  RETURN jsonb_build_object(
-    'ok', true, 'entitlement_id', v_ent.id, 'given', v_name,
-    'card', get_card_state(v_ent.customer_id));
+  SELECT name INTO v_given FROM reward_options WHERE id = v_opt;
+
+  UPDATE entitlements
+     SET status = 'used', used_at = now(), used_branch_id = v_tok.branch_id,
+         chosen_option_id = v_opt, confirmed_by = v_tok.issued_by
+   WHERE id = p_entitlement_id;
+
+  RETURN jsonb_build_object('ok', true, 'entitlement_id', p_entitlement_id,
+    'given', v_given, 'card', get_card_state(p_customer_id));
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ---------------------------------------------------------------------------
+-- 10) void_redemption — พนักงานกดคืนสิทธิ์เมื่อลูกค้ากดพลาด
+--
+--  แทนที่จะเอา dialog "แน่ใจไหม?" ไปขวางทุกคนเพื่อกันคนส่วนน้อยที่กดพลาด
+--  ให้แก้ทีหลังได้แทน ทางเดินปกติจึงไม่มีอะไรมาขวางเลย
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION void_redemption(
+  p_entitlement_id uuid,
+  p_staff_id       uuid
+) RETURNS jsonb AS $$
+DECLARE
+  v_ent entitlements%ROWTYPE;
+  v_win int;
+BEGIN
+  SELECT COALESCE((value->>'redemption_undo_minutes')::int, 10) INTO v_win
+    FROM app_settings WHERE key = 'redemption_undo_minutes';
+
+  UPDATE entitlements
+     SET status = 'available', used_at = NULL, used_branch_id = NULL,
+         chosen_option_id = NULL, confirmed_by = NULL
+   WHERE id = p_entitlement_id AND status = 'used'
+     AND used_at > now() - make_interval(mins => COALESCE(v_win, 10))
+  RETURNING * INTO v_ent;
+
+  IF v_ent.id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'reason', 'not_undoable');
+  END IF;
+
+  INSERT INTO audit_logs (actor_type, actor_id, action, target)
+  VALUES ('staff', p_staff_id, 'redemption.void', p_entitlement_id::text);
+
+  RETURN jsonb_build_object('ok', true, 'entitlement_id', p_entitlement_id);
 END;
 $$ LANGUAGE plpgsql;

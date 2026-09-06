@@ -116,7 +116,9 @@ CREATE INDEX ix_options_checkpoint ON reward_options (checkpoint_id, sort)
   WHERE is_active;
 
 -- ------------------------------------------------------------- สิทธิ์รางวัล ---
-CREATE TYPE entitlement_status AS ENUM ('available', 'holding', 'used', 'voided');
+-- ไม่มีสถานะ 'holding' เพราะไม่มีขั้นจอง — ลูกค้าสแกน QR ของพนักงานแล้วเลือกใช้ได้เลย
+-- การยืนยันคือการที่พนักงานส่งของให้ ไม่ใช่ dialog บนหน้าจอ
+CREATE TYPE entitlement_status AS ENUM ('available', 'used', 'voided');
 
 CREATE TABLE entitlements (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -125,8 +127,6 @@ CREATE TABLE entitlements (
   checkpoint_id    uuid NOT NULL REFERENCES reward_checkpoints(id),
   slot_no          int  NOT NULL,
   status           entitlement_status NOT NULL DEFAULT 'available',
-  hold_code        char(6),                      -- รหัสจอง 6 หลัก อายุ 5 นาที
-  hold_expires_at  timestamptz,
   used_at          timestamptz,
   used_branch_id   uuid REFERENCES branches(id),
   chosen_option_id uuid REFERENCES reward_options(id),
@@ -134,16 +134,11 @@ CREATE TABLE entitlements (
   created_at       timestamptz NOT NULL DEFAULT now(),
   -- หนึ่ง checkpoint บนหนึ่งบัตร ให้สิทธิ์ได้ครั้งเดียวตลอดกาล
   CONSTRAINT uq_entitlement_card_checkpoint UNIQUE (card_id, checkpoint_id),
-  CONSTRAINT hold_has_code_and_expiry
-    CHECK (status <> 'holding' OR (hold_code IS NOT NULL AND hold_expires_at IS NOT NULL)),
   CONSTRAINT used_has_details
     CHECK (status <> 'used' OR (used_at IS NOT NULL AND confirmed_by IS NOT NULL))
 );
--- รหัสจองที่ยังไม่หมดอายุต้องไม่ซ้ำกันทั้งระบบ
-CREATE UNIQUE INDEX uq_active_hold_code
-  ON entitlements (hold_code) WHERE status = 'holding';
 CREATE INDEX ix_entitlement_customer
-  ON entitlements (customer_id) WHERE status IN ('available', 'holding');
+  ON entitlements (customer_id) WHERE status = 'available';
 
 -- ------------------------------------------------------------ QR โหมด A ---
 CREATE TYPE token_status AS ENUM ('active', 'consumed', 'expired', 'voided');
@@ -165,6 +160,29 @@ CREATE TABLE earn_tokens (
 -- ค้นหาตอนเคลม: ใช้ code เป็นหลัก (unique index ครอบคลุมแล้ว)
 CREATE INDEX ix_token_branch_open
   ON earn_tokens (branch_id, issued_at DESC) WHERE status = 'active';
+
+-- ------------------------------------------------- QR รับรางวัล (ฝั่งร้าน) ---
+-- พนักงานกดออก QR นี้ตอนลูกค้ามารับรางวัล แล้วลูกค้าสแกนด้วยกล้อง LINE
+-- ทิศทางเดียวกับตอนสะสมแต้ม ลูกค้าจึงไม่ต้องเรียนรู้ท่าใหม่
+-- และเครื่องพนักงานไม่ต้องมีกล้อง
+CREATE TABLE redeem_tokens (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code           text NOT NULL UNIQUE,
+  branch_id      uuid NOT NULL REFERENCES branches(id),
+  status         token_status NOT NULL DEFAULT 'active',
+  expires_at     timestamptz NOT NULL,          -- สั้นกว่า QR สะสม ลูกค้ายืนอยู่ตรงหน้าแล้ว
+  issued_by      uuid REFERENCES staff_users(id),
+  issued_at      timestamptz NOT NULL DEFAULT now(),
+  consumed_by    uuid REFERENCES customers(id),
+  consumed_at    timestamptz,
+  entitlement_id uuid REFERENCES entitlements(id),  -- สิทธิ์ที่ลูกค้าเลือกใช้
+  CONSTRAINT redeem_consumed_has_details
+    CHECK (status <> 'consumed'
+           OR (consumed_by IS NOT NULL AND consumed_at IS NOT NULL
+               AND entitlement_id IS NOT NULL))
+);
+CREATE INDEX ix_redeem_branch_open
+  ON redeem_tokens (branch_id, issued_at DESC) WHERE status = 'active';
 
 -- -------------------------------------------- คำขอสแตมป์เดลิเวอรี่ (รูป) ---
 -- ลูกค้าส่งรูปใบเสร็จเข้าแชท LINE -> เจ้าของกดอนุมัติ -> ปั๊มสแตมป์
