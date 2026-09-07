@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f db/migrations/0001_init.sql -f db/migrations/0002_functions.sql",
-    "db:seed": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f db/seed.sql",
-    "db:reset": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' && npm run db:migrate && npm run db:seed"
+    "db:migrate": "node scripts/psql.mjs -f db/migrations/0001_init.sql -f db/migrations/0002_functions.sql",
+    "db:seed": "node scripts/psql.mjs -f db/seed.sql",
+    "db:reset": "node scripts/psql.mjs -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' && npm run db:migrate && npm run db:seed",
+    "db:psql": "node scripts/psql.mjs",
+    "staff:add": "node scripts/create-staff.mjs"
   },
   "dependencies": {
     "@line/bot-sdk": "^9.5.0",

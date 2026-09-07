@@ -5,6 +5,7 @@
  * ใช้ PBKDF2 สูตรเดียวกับ lib/auth/staff.ts เป๊ะ ๆ ถ้าแก้ที่นั่นต้องแก้ที่นี่ด้วย
  */
 import postgres from "postgres";
+import { loadEnv } from "./load-env.mjs";
 import { webcrypto as crypto } from "node:crypto";
 
 const ITERATIONS = 210_000;
@@ -25,6 +26,11 @@ if (!name || !/^\d{6}$/.test(pin ?? "")) {
   process.exit(1);
 }
 
+loadEnv();
+if (!process.env.DATABASE_URL) {
+  console.error("ไม่พบ DATABASE_URL — สร้าง .env.local ก่อน");
+  process.exit(1);
+}
 const sql = postgres(process.env.DATABASE_URL, { prepare: false });
 const hash = await hashPin(pin);
 
