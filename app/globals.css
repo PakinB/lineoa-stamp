@@ -4,6 +4,13 @@
  */
 /* สีดูดจากไฟล์การ์ดจริงของร้าน public/brand/stampbg.png */
 :root {
+  /*
+   * บอกเบราว์เซอร์ว่าหน้านี้เป็นธีมสว่างอย่างเดียว
+   * ถ้าไม่บอก Chrome และ Samsung Internet บนมือถือที่ตั้งโหมดมืดไว้
+   * จะแปลงสีให้เองอัตโนมัติ ครีมจะกลายเป็นน้ำตาลเข้มจนดูเหมือนจอดำ
+   */
+  color-scheme: light;
+
   --brand:   #2B86BC;  /* น้ำเงินหลักบนการ์ด */
   --brand-d: #1F6690;  /* เข้มขึ้น ใช้ตอนกดปุ่ม */
   --brand-s: #56A8D8;  /* ฟ้าอ่อน ขอบการ์ด */
@@ -22,7 +29,10 @@
 
 html, body {
   margin: 0;
+  /* พื้นครีมของการ์ด ไล่เป็นฟ้าอ่อนด้านล่างให้รับกับลายคลื่นบนบัตร */
   background: var(--ground);
+  background-image: linear-gradient(180deg, #FFF9F0 0%, var(--ground) 42%, #EAF2F7 100%);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: "IBM Plex Sans Thai", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   font-size: 17px;
