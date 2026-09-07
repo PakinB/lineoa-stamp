@@ -89,10 +89,13 @@ Postgres มาตรฐาน ไม่ได้ใช้ Supabase SDK สั�
 
    Region เลือกผิดแก้ทีหลังไม่ได้ ต้องสร้าง project ใหม่แล้วย้ายข้อมูล
    ระยะทางมีผลจริงเพราะลูกค้ายืนรออยู่หน้าเคาน์เตอร์ตอนสแกน
-2. **รัน migration** — `npm run db:migrate && npm run db:seed`
+2. **เอา connection string** — กดปุ่ม **Connect** ที่แถบบนสุดของหน้า project
+   **ไม่ได้อยู่ใน Settings** (Supabase ย้ายออกมาแล้ว ในเมนู Settings จะไม่มีคำว่า Database)
+   ในหน้าต่างที่เด้งขึ้นมา เลือกแท็บ **Transaction pooler** พอร์ต `6543`
+3. **รัน migration** — `npm run db:migrate && npm run db:seed`
    หรือถ้าไม่มี `psql` ในเครื่อง ก๊อปเนื้อไฟล์ใน `db/` ไปวางใน SQL Editor
    ของ Supabase แล้วรันตามลำดับ `0001` → `0002` → `seed.sql`
-3. **สร้าง bucket ชื่อ `receipts`** ตั้งเป็น private — เก็บรูปใบเสร็จเดลิเวอรี่
+4. **สร้าง bucket ชื่อ `receipts`** ตั้งเป็น private — เก็บรูปใบเสร็จเดลิเวอรี่
    (ยังไม่ต้องทำจนกว่าจะเริ่มทำฟีเจอร์เดลิเวอรี่)
 
 ### ไม่ต้องทำ
