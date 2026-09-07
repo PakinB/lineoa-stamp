@@ -1,0 +1,117 @@
+/*
+ * หน้าจอพนักงานใช้งานตอนมือเปียกและร้านเสียงดัง (§4)
+ * ทุกอย่างจึงใหญ่ ตัดกันชัด และกดด้วยนิ้วโป้งมือเดียวได้
+ */
+:root {
+  --chili:   #B8332A;
+  --chili-d: #8E241C;
+  --ink:     #231A17;
+  --muted:   #7A6960;
+  --ground:  #FAF7F4;
+  --surface: #FFFFFF;
+  --line:    #E4DAD2;
+  --ok:      #3F7D3B;
+  --ok-bg:   #EEF6ED;
+  --warn:    #9A6612;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "IBM Plex Sans Thai", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* กันหน้าจอเด้งตอนคีย์บอร์ดขึ้น และเผื่อขอบล่างของ iPhone */
+.screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 16px);
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 14px 0 10px; min-height: 56px;
+}
+.topbar h1 { font-size: 18px; margin: 0; font-weight: 600; }
+.topbar .who { font-size: 13px; color: var(--muted); }
+
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; border: none; border-radius: 14px; cursor: pointer;
+  font-family: inherit; font-size: 20px; font-weight: 600;
+  padding: 22px 20px; background: var(--chili); color: #fff;
+  transition: transform .06s ease, background .15s ease;
+}
+.btn:active { transform: scale(.985); background: var(--chili-d); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+.btn.small { font-size: 16px; padding: 14px 16px; border-radius: 11px; }
+.btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.grow  { flex: 1; }
+.center { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 20px;
+}
+
+.hint { color: var(--muted); font-size: 15px; text-align: center; margin: 0; }
+.big  { font-size: 30px; font-weight: 700; line-height: 1.25; text-align: center; margin: 0; }
+.err  { color: var(--chili); text-align: center; font-weight: 600; min-height: 24px; margin: 0; }
+
+/* ---------- แป้นตัวเลข: ปุ่มตัวเลขแทนช่องพิมพ์ กันคีย์บอร์ดเด้งบังจอ ---------- */
+.pin-dots { display: flex; gap: 14px; justify-content: center; margin: 26px 0; }
+.pin-dots i {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--line); background: transparent; display: block;
+}
+.pin-dots i.on { background: var(--chili); border-color: var(--chili); }
+
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.keypad button {
+  font-family: inherit; font-size: 30px; font-weight: 600;
+  padding: 20px 0; border-radius: 14px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); color: var(--ink);
+}
+.keypad button:active { background: var(--ground); }
+.keypad button.blank { visibility: hidden; }
+
+/* ---------- หน้า QR ---------- */
+.qr-wrap {
+  background: #fff; border-radius: 18px; padding: 18px;
+  border: 1px solid var(--line); line-height: 0;
+}
+.qr-wrap img { width: 100%; max-width: 320px; height: auto; display: block; }
+
+.countdown { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 15px; }
+
+.done { background: var(--ok-bg); border-color: #CDE3CB; }
+.done .big { color: var(--ok); }
+.tick {
+  width: 68px; height: 68px; border-radius: 50%; background: var(--ok);
+  color: #fff; font-size: 38px; display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 14px;
+}
+
+.rows { display: flex; flex-direction: column; gap: 2px; }
+.row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 14px 0; border-bottom: 1px solid var(--line); gap: 16px;
+}
+.row:last-child { border-bottom: none; }
+.row b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.row span { color: var(--muted); }
+.row.flag b { color: var(--warn); }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
