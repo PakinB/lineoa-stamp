@@ -75,7 +75,7 @@ export default function QrScreen({ mode }: { mode: Mode }) {
       // วาด QR ให้เสร็จก่อน แล้วค่อยเปลี่ยนสถานะพร้อมกันทีเดียว
       // ถ้าตั้งเวลาหมดอายุก่อนวาดเสร็จ จะมีช่วงที่หน้าจอไม่รู้ว่าจะแสดงอะไร
       const img = await QRCode.toDataURL(d.url, {
-        margin: 1, width: 640, color: { dark: "#231A17", light: "#FFFFFF" },
+        margin: 1, width: 640, color: { dark: "#23404F", light: "#FFFFFF" },
       });
 
       const ms = new Date(d.expires_at).getTime();

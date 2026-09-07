@@ -2,14 +2,17 @@
  * หน้าจอพนักงานใช้งานตอนมือเปียกและร้านเสียงดัง (§4)
  * ทุกอย่างจึงใหญ่ ตัดกันชัด และกดด้วยนิ้วโป้งมือเดียวได้
  */
+/* สีดูดจากไฟล์การ์ดจริงของร้าน public/brand/stampbg.png */
 :root {
-  --chili:   #B8332A;
-  --chili-d: #8E241C;
-  --ink:     #231A17;
-  --muted:   #7A6960;
-  --ground:  #FAF7F4;
+  --brand:   #2B86BC;  /* น้ำเงินหลักบนการ์ด */
+  --brand-d: #1F6690;  /* เข้มขึ้น ใช้ตอนกดปุ่ม */
+  --brand-s: #56A8D8;  /* ฟ้าอ่อน ขอบการ์ด */
+  --stamp:   #DB0100;  /* แดงตราประทับ */
+  --ink:     #23404F;
+  --muted:   #7B8E99;
+  --ground:  #FBF1E5;  /* ครีมพื้นการ์ด */
   --surface: #FFFFFF;
-  --line:    #E4DAD2;
+  --line:    #E3D9CB;
   --ok:      #3F7D3B;
   --ok-bg:   #EEF6ED;
   --warn:    #9A6612;
@@ -48,10 +51,10 @@ html, body {
   display: flex; align-items: center; justify-content: center; gap: 10px;
   width: 100%; border: none; border-radius: 14px; cursor: pointer;
   font-family: inherit; font-size: 20px; font-weight: 600;
-  padding: 22px 20px; background: var(--chili); color: #fff;
+  padding: 22px 20px; background: var(--brand); color: #fff;
   transition: transform .06s ease, background .15s ease;
 }
-.btn:active { transform: scale(.985); background: var(--chili-d); }
+.btn:active { transform: scale(.985); background: var(--brand-d); }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn.ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
 .btn.small { font-size: 16px; padding: 14px 16px; border-radius: 11px; }
@@ -68,7 +71,7 @@ html, body {
 
 .hint { color: var(--muted); font-size: 15px; text-align: center; margin: 0; }
 .big  { font-size: 30px; font-weight: 700; line-height: 1.25; text-align: center; margin: 0; }
-.err  { color: var(--chili); text-align: center; font-weight: 600; min-height: 24px; margin: 0; }
+.err  { color: var(--brand); text-align: center; font-weight: 600; min-height: 24px; margin: 0; }
 
 /* ---------- แป้นตัวเลข: ปุ่มตัวเลขแทนช่องพิมพ์ กันคีย์บอร์ดเด้งบังจอ ---------- */
 .pin-dots { display: flex; gap: 14px; justify-content: center; margin: 26px 0; }
@@ -76,7 +79,7 @@ html, body {
   width: 16px; height: 16px; border-radius: 50%;
   border: 2px solid var(--line); background: transparent; display: block;
 }
-.pin-dots i.on { background: var(--chili); border-color: var(--chili); }
+.pin-dots i.on { background: var(--brand); border-color: var(--brand); }
 
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .keypad button {
@@ -118,71 +121,57 @@ html, body {
 
 /* ═══════════════════════════ หน้าจอลูกค้า ═══════════════════════════ */
 
-.card-head { text-align: center; padding: 8px 0 18px; }
-.card-head .no { font-size: 13px; color: var(--muted); letter-spacing: .04em; }
-.card-head .count {
-  font-size: 44px; font-weight: 700; line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-}
-.card-head .count small { font-size: 22px; color: var(--muted); font-weight: 500; }
-
-/* บัตร 10 ช่อง เรียง 5 คูณ 2 ให้ checkpoint ที่ช่อง 10 ไปจบมุมขวาล่างพอดี */
-.slots {
-  display: grid; grid-template-columns: repeat(5, 1fr);
-  gap: 18px 10px; padding: 4px 2px 8px;
-}
-.slot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-
-.dot {
-  width: 100%; aspect-ratio: 1; max-width: 62px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  border: 2px solid var(--line); background: var(--surface);
+/*
+ * บัตรจริงของร้านเป็นภาพเดียว แล้ววางตราประทับทับลงบนช่องที่สะสมแล้ว
+ * ตำแหน่งช่องวัดจากไฟล์ต้นฉบับ 1537x1023 แล้วแปลงเป็นเปอร์เซ็นต์
+ * จะได้ขยายย่อตามความกว้างจอโดยไม่หลุดตำแหน่ง
+ */
+.lami {
   position: relative;
+  width: 100%;
+  aspect-ratio: 1537 / 1023;
+  border-radius: 12px;
+  overflow: hidden;
 }
-.dot .pip { width: 44%; height: 44%; border-radius: 50%; background: var(--chili); display: none; }
-.dot.on { border-color: var(--chili); background: #FBEDEA; }
-.dot.on .pip { display: block; }
+.lami > img.bg { width: 100%; height: 100%; display: block; object-fit: cover; }
 
-/* checkpoint = วงประรอบนอก บอกว่าช่องนี้มีรางวัลแปะอยู่ */
-.dot.cp::after {
-  content: ""; position: absolute; inset: -7px;
-  border: 2px dashed var(--peppercorn, #66742F); border-radius: 50%;
+.lami .mark {
+  position: absolute;
+  width: 13.6%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,.28));
+  pointer-events: none;
 }
-.dot.cp.claimed::after { border-style: solid; }
-
-.slot .no { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.slot .gift { font-size: 11px; color: #66742F; text-align: center; line-height: 1.25; }
 
 /* ปั๊มลงมาเหมือนกดตราประทับจริง */
 @keyframes stamp-in {
-  0%   { transform: scale(2.6) rotate(-20deg); opacity: 0; }
-  55%  { transform: scale(.9)  rotate(4deg);   opacity: 1; }
-  100% { transform: scale(1)   rotate(0deg);   opacity: 1; }
+  0%   { transform: translate(-50%,-50%) scale(3) rotate(-24deg); opacity: 0; }
+  55%  { transform: translate(-50%,-50%) scale(.88) rotate(5deg); opacity: 1; }
+  100% { transform: translate(-50%,-50%) scale(1) rotate(0deg);   opacity: 1; }
 }
-.dot.just .pip { animation: stamp-in .45s cubic-bezier(.2,.9,.3,1.4) both; }
-@keyframes ring-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(184,51,42,.45); }
-  100% { box-shadow: 0 0 0 16px rgba(184,51,42,0); }
-}
-.dot.just { animation: ring-pulse .7s ease-out .1s both; }
+.lami .mark.just { animation: stamp-in .5s cubic-bezier(.2,.9,.3,1.5) both; }
 
-/* แถบฉลองตอนถึง checkpoint */
+.card-head { text-align: center; padding: 10px 0 12px; }
+.card-head .count {
+  font-size: 40px; font-weight: 700; line-height: 1.1; color: var(--brand);
+  font-variant-numeric: tabular-nums;
+}
+.card-head .count small { font-size: 20px; color: var(--muted); font-weight: 500; }
+
+.next-hint { text-align: center; color: var(--muted); font-size: 15px; padding: 14px 0 4px; }
+.next-hint b { color: var(--ink); font-size: 17px; }
+
 @keyframes pop-in {
   0%   { transform: translateY(14px) scale(.94); opacity: 0; }
   100% { transform: translateY(0)    scale(1);   opacity: 1; }
 }
 .celebrate {
-  background: #FBEDEA; border: 2px solid var(--chili); border-radius: 16px;
+  background: #FDECEA; border: 2px solid var(--stamp); border-radius: 16px;
   padding: 22px 18px; text-align: center; animation: pop-in .4s ease-out both;
 }
 .celebrate .emo { font-size: 42px; line-height: 1; }
-.celebrate .what { font-size: 25px; font-weight: 700; color: var(--chili); margin: 8px 0 4px; }
-
-.next-hint {
-  text-align: center; color: var(--muted); font-size: 15px;
-  padding: 14px 0 4px;
-}
-.next-hint b { color: var(--ink); font-size: 17px; }
+.celebrate .what { font-size: 25px; font-weight: 700; color: var(--stamp); margin: 8px 0 4px; }
 
 /* รายการสิทธิ์ให้ลูกค้าแตะเลือก */
 .pick { display: flex; flex-direction: column; gap: 12px; }
@@ -192,13 +181,11 @@ html, body {
   border-radius: 14px; padding: 20px; font-size: 19px; font-weight: 600;
   color: var(--ink); display: flex; align-items: center; gap: 14px;
 }
-.pick button:active { border-color: var(--chili); background: #FBEDEA; }
+.pick button:active { border-color: var(--brand); background: #EAF4FA; }
 .pick .emo { font-size: 26px; }
 
-.wallet {
-  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 6px 0 2px;
-}
+.wallet { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 10px 0 2px; }
 .chip-r {
-  background: #F0F2E4; color: #4E5A24; border-radius: 999px;
-  padding: 6px 13px; font-size: 13px; font-weight: 600;
+  background: #EAF4FA; color: var(--brand-d); border: 1px solid #CDE4F1;
+  border-radius: 999px; padding: 6px 13px; font-size: 13px; font-weight: 600;
 }
