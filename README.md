@@ -12,6 +12,7 @@ npm install
 cp .env.example .env.local     # แล้วใส่ค่าจริง
 npm run db:migrate
 npm run db:seed
+node scripts/create-staff.mjs "ชื่อพนักงาน" 246810 staff main
 npm run dev
 ```
 
@@ -33,8 +34,8 @@ npm run dev
 | Schema + constraint (§8) | ✅ เสร็จ |
 | ตรรกะแกนใน Postgres (§5) | ✅ เสร็จ — สะสม + แลกของรางวัลครบ |
 | สัญญา API (§14) | ✅ เสร็จ |
-| Auth ตรวจ LIFF token | ⬜ ยังไม่เริ่ม — ต้องทำก่อน API |
-| API routes | ⬜ ยังไม่เริ่ม |
+| Auth ตรวจ LIFF token + PIN พนักงาน | ✅ เสร็จ |
+| API routes | ✅ เสร็จ — ลูกค้า 4 เส้น พนักงาน 8 เส้น |
 | หน้าจอลูกค้า (LIFF) | ⬜ ยังไม่เริ่ม |
 | เว็บพนักงาน | ⬜ ยังไม่เริ่ม |
 | หน้าแอดมิน + คิวอนุมัติเดลิเวอรี่ | ⬜ ยังไม่เริ่ม |

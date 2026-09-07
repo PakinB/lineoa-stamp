@@ -62,7 +62,13 @@ lib/db.ts                        ตัวเชื่อม Postgres (ไม่
 app/(liff)/                      หน้าจอลูกค้า
 app/(staff)/                     เว็บพนักงาน
 app/(admin)/                     หน้าเจ้าของ รวมคิวอนุมัติเดลิเวอรี่
-app/api/                         API ทั้งหมด
+app/api/me/*                     ลูกค้า: บัตร + ยินยอม PDPA
+app/api/stamps/claim             ลูกค้า: สแกน QR สะสม
+app/api/redeem/[code]            ลูกค้า: ดู/ใช้สิทธิ์รางวัล
+app/api/staff/*                  พนักงาน: login, QR, สถานะ, คืนสิทธิ์, สรุปกะ
+lib/auth/line.ts                 ตรวจ LIFF token กับ LINE (ตรวจ client_id ด้วย)
+lib/auth/staff.ts                PIN + PBKDF2 (ไม่ใช้ bcrypt เพราะรันบน edge ไม่ได้)
+scripts/create-staff.mjs         เพิ่มพนักงานพร้อม PIN
 ```
 
 ## คำสั่ง
