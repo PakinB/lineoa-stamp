@@ -3,6 +3,8 @@ node_modules/
 out/
 build/
 
+.CLAUDE.md
+
 .env
 .env.local
 .env*.local
