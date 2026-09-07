@@ -70,10 +70,33 @@ export async function getOrCreateCustomer(p: LineProfile): Promise<Customer> {
   return c;
 }
 
+/**
+ * ทางลัดสำหรับพัฒนาเท่านั้น — ให้ทดสอบหน้าลูกค้าได้โดยยังไม่ต้องตั้ง LINE
+ *
+ * ต้องเป็นจริงพร้อมกันสองข้อถึงจะทำงาน:
+ *   1. ไม่ได้รันแบบ production
+ *   2. ตั้ง DEV_FAKE_LINE_USER ไว้ในไฟล์ env ด้วยตัวเอง
+ *
+ * ถ้าขาดข้อใดข้อหนึ่ง ฟังก์ชันนี้คืน null และระบบกลับไปตรวจ token ตามปกติ
+ * เงื่อนไขที่หนึ่งเป็นตัวกันหลัก เพราะ NODE_ENV บน Vercel/Cloudflare
+ * เป็น production เสมอ ตั้งค่าทับจากภายนอกไม่ได้
+ */
+function devCustomer(): LineProfile | null {
+  if (process.env.NODE_ENV === "production") return null;
+  const uid = process.env.DEV_FAKE_LINE_USER;
+  if (!uid) return null;
+  return { userId: uid, displayName: process.env.DEV_FAKE_LINE_NAME ?? "ลูกค้าทดสอบ" };
+}
+
 /** ดึงตัวตนลูกค้าจาก Authorization: Bearer <LIFF access token> */
 export async function requireCustomer(req: Request): Promise<Customer> {
   const auth = req.headers.get("authorization");
   const token = auth?.startsWith("Bearer ") ? auth.slice(7).trim() : null;
-  if (!token) throw new HttpError("unauthenticated", 401);
+
+  if (!token) {
+    const dev = devCustomer();
+    if (dev) return getOrCreateCustomer(dev);
+    throw new HttpError("unauthenticated", 401);
+  }
   return getOrCreateCustomer(await verifyLiffToken(token));
 }

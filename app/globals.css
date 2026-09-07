@@ -115,3 +115,90 @@ html, body {
 .row.flag b { color: var(--warn); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ═══════════════════════════ หน้าจอลูกค้า ═══════════════════════════ */
+
+.card-head { text-align: center; padding: 8px 0 18px; }
+.card-head .no { font-size: 13px; color: var(--muted); letter-spacing: .04em; }
+.card-head .count {
+  font-size: 44px; font-weight: 700; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.card-head .count small { font-size: 22px; color: var(--muted); font-weight: 500; }
+
+/* บัตร 10 ช่อง เรียง 5 คูณ 2 ให้ checkpoint ที่ช่อง 10 ไปจบมุมขวาล่างพอดี */
+.slots {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 18px 10px; padding: 4px 2px 8px;
+}
+.slot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+.dot {
+  width: 100%; aspect-ratio: 1; max-width: 62px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--line); background: var(--surface);
+  position: relative;
+}
+.dot .pip { width: 44%; height: 44%; border-radius: 50%; background: var(--chili); display: none; }
+.dot.on { border-color: var(--chili); background: #FBEDEA; }
+.dot.on .pip { display: block; }
+
+/* checkpoint = วงประรอบนอก บอกว่าช่องนี้มีรางวัลแปะอยู่ */
+.dot.cp::after {
+  content: ""; position: absolute; inset: -7px;
+  border: 2px dashed var(--peppercorn, #66742F); border-radius: 50%;
+}
+.dot.cp.claimed::after { border-style: solid; }
+
+.slot .no { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.slot .gift { font-size: 11px; color: #66742F; text-align: center; line-height: 1.25; }
+
+/* ปั๊มลงมาเหมือนกดตราประทับจริง */
+@keyframes stamp-in {
+  0%   { transform: scale(2.6) rotate(-20deg); opacity: 0; }
+  55%  { transform: scale(.9)  rotate(4deg);   opacity: 1; }
+  100% { transform: scale(1)   rotate(0deg);   opacity: 1; }
+}
+.dot.just .pip { animation: stamp-in .45s cubic-bezier(.2,.9,.3,1.4) both; }
+@keyframes ring-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(184,51,42,.45); }
+  100% { box-shadow: 0 0 0 16px rgba(184,51,42,0); }
+}
+.dot.just { animation: ring-pulse .7s ease-out .1s both; }
+
+/* แถบฉลองตอนถึง checkpoint */
+@keyframes pop-in {
+  0%   { transform: translateY(14px) scale(.94); opacity: 0; }
+  100% { transform: translateY(0)    scale(1);   opacity: 1; }
+}
+.celebrate {
+  background: #FBEDEA; border: 2px solid var(--chili); border-radius: 16px;
+  padding: 22px 18px; text-align: center; animation: pop-in .4s ease-out both;
+}
+.celebrate .emo { font-size: 42px; line-height: 1; }
+.celebrate .what { font-size: 25px; font-weight: 700; color: var(--chili); margin: 8px 0 4px; }
+
+.next-hint {
+  text-align: center; color: var(--muted); font-size: 15px;
+  padding: 14px 0 4px;
+}
+.next-hint b { color: var(--ink); font-size: 17px; }
+
+/* รายการสิทธิ์ให้ลูกค้าแตะเลือก */
+.pick { display: flex; flex-direction: column; gap: 12px; }
+.pick button {
+  font-family: inherit; text-align: left; cursor: pointer;
+  background: var(--surface); border: 2px solid var(--line);
+  border-radius: 14px; padding: 20px; font-size: 19px; font-weight: 600;
+  color: var(--ink); display: flex; align-items: center; gap: 14px;
+}
+.pick button:active { border-color: var(--chili); background: #FBEDEA; }
+.pick .emo { font-size: 26px; }
+
+.wallet {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 6px 0 2px;
+}
+.chip-r {
+  background: #F0F2E4; color: #4E5A24; border-radius: 999px;
+  padding: 6px 13px; font-size: 13px; font-weight: 600;
+}
