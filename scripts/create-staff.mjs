@@ -8,7 +8,7 @@ import postgres from "postgres";
 import { loadEnv } from "./load-env.mjs";
 import { webcrypto as crypto } from "node:crypto";
 
-const ITERATIONS = 210_000;
+const ITERATIONS = 100_000;
 const enc = new TextEncoder();
 const hex = (b) => [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
 

@@ -9,11 +9,15 @@ import { readSession, signSession, SESSION_COOKIE, type StaffSession } from "@/l
  * ใช้ PBKDF2 ผ่าน Web Crypto แทน bcrypt เพราะ bcrypt เป็น native module
  * ที่รันบน edge runtime ไม่ได้ และเราตั้งใจจะ deploy บน Cloudflare Workers (§7)
  *
+ * จำนวนรอบต้องไม่เกิน 100,000 เพราะ Cloudflare Workers ปฏิเสธค่าที่สูงกว่านั้น
+ * (NotSupportedError: iteration counts above 100000 are not supported)
+ * ถ้าเพิ่มเกินนี้จะ build ผ่านแต่พังตอนรันบนของจริงเท่านั้น
+ *
  * PIN 6 หลักมีแค่ล้านความเป็นไปได้ ลำพัง hash จึงไม่พอ
- * ต้องมีการล็อกหลังเดาผิดด้วย ดู verifyPin()
+ * แนวป้องกันจริงคือการจำกัดจำนวนครั้งที่เดาผิด ซึ่งยังไม่ได้ทำ ดู README
  */
 
-const ITERATIONS = 210_000;
+const ITERATIONS = 100_000;
 const enc = new TextEncoder();
 
 function hex(b: Uint8Array) { return [...b].map((x) => x.toString(16).padStart(2, "0")).join(""); }
