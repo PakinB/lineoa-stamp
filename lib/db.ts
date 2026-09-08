@@ -50,11 +50,15 @@ const WORKER_OPTS = { ...OPTS, max: 1, fetch_types: false } as const;
  * ผลคือ Worker พยายามต่อ Supabase ตรง ๆ ไม่ผ่าน Hyperdrive แล้วค้าง
  * โดยไม่มี error ให้เห็น
  */
-function cloudflareEnv(): Record<string, unknown> | null {
+function cloudflareEnv(): {
+  env: Record<string, unknown> | null;
+  ctx: object | undefined;
+} {
   try {
-    return (getCloudflareContext().env as Record<string, unknown>) ?? null;
+    const c = getCloudflareContext();
+    return { env: (c.env as Record<string, unknown>) ?? null, ctx: c.ctx };
   } catch {
-    return null;
+    return { env: null, ctx: undefined };
   }
 }
 
@@ -69,19 +73,42 @@ function connectionString(env: Record<string, unknown> | null): string {
 
 let local: Sql | undefined;
 
+/**
+ * เก็บตัวเชื่อมไว้ต่อหนึ่งคำขอ ไม่ใช่ต่อหนึ่งคำสั่ง
+ *
+ * ผูกไว้กับอ็อบเจกต์ ctx ของคำขอนั้น ๆ ผ่าน WeakMap ทำให้:
+ *   - คำสั่งหลายคำสั่งในคำขอเดียวใช้ตัวเชื่อมร่วมกัน ไม่เปิดใหม่ซ้ำ ๆ
+ *   - คำขอคนละครั้งไม่ใช้ตัวเชื่อมร่วมกัน ซึ่ง Workers ห้ามไว้
+ *
+ * เดิมเปิดใหม่ทุกคำสั่ง ทำให้หนึ่งคำขอกินหลายตัวเชื่อมและติด ๆ ดับ ๆ
+ */
+const perRequest = new WeakMap<object, Sql>();
+
+function workerClient(ctx: object | undefined, env: Record<string, unknown>): Sql {
+  // ถ้าไม่มี ctx ของคำขอนี้ ห้ามใช้ env เป็นกุญแจแทนเด็ดขาด
+  // เพราะ env เป็นอ็อบเจกต์เดียวกันทั้ง isolate จะกลายเป็นใช้ตัวเชื่อมซ้ำ
+  // ข้ามคำขอ ซึ่ง Workers ห้ามไว้ และทำให้คำขอค้างแบบไม่มีรูปแบบ
+  if (!ctx) return postgres(connectionString(env), WORKER_OPTS);
+
+  const found = perRequest.get(ctx);
+  if (found) return found;
+
+  const client = postgres(connectionString(env), WORKER_OPTS);
+  perRequest.set(ctx, client);
+  // ไม่สั่งปิดที่นี่: client.end() เริ่มปิดทันทีที่เรียก ไม่ได้รอให้คำสั่งที่ค้างอยู่จบก่อน
+  // ส่งเข้า waitUntil ตรง ๆ จึงกลายเป็นการปิดตัดหน้าคำสั่งของตัวเอง
+  // ปล่อยให้ isolate เก็บกวาด — หนึ่งตัวเชื่อมต่อหนึ่งคำขอถือว่าน้อยพอแล้ว
+  return client;
+}
+
+
 /** ใช้เหมือนเดิมทุกที่: sql`SELECT ...` */
 export const sql = new Proxy(function () {} as unknown as Sql, {
   apply(_t, _self, args: unknown[]) {
-    const env = cloudflareEnv();
+    const { env, ctx } = cloudflareEnv();
 
     if (env) {
-      // บน Workers — ตัวเชื่อมใหม่ต่อหนึ่งคำสั่ง
-      //
-      // ไม่เรียก client.end() เด็ดขาด: Workers รอให้ I/O ทุกตัวจบก่อนปิดคำขอ
-      // การสั่งปิด connection ทิ้งไว้จึงกลายเป็น I/O ค้างที่ทำให้รันไทม์
-      // ตัดสินว่าโค้ดแฮงก์แล้วยกเลิกคำขอทั้งอัน
-      // ปล่อยให้ isolate เก็บกวาดเอง ส่วนฝั่งเซิร์ฟเวอร์ Hyperdrive ดูแล pool ให้อยู่แล้ว
-      const client = postgres(connectionString(env), WORKER_OPTS);
+      const client = workerClient(ctx, env);
       return (client as unknown as (...a: unknown[]) => unknown)(...args);
     }
 
