@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import StampCard from "@/components/StampCard";
 import type { CardState, RedeemableListResponse } from "@/lib/api-types";
+import { initLiff, accessToken } from "@/lib/liff";
 
 /**
  * หน้าจอลูกค้าทั้งหมดอยู่ในคอมโพเนนต์เดียว
@@ -24,10 +25,14 @@ const REASONS: Record<string, string> = {
   unauthenticated: "กรุณาเปิดหน้านี้จากแอป LINE",
 };
 
-/** เผื่อไว้ให้ต่อ LIFF ทีหลัง — ตอนนี้ยังไม่มี token ก็ยิงเปล่า ๆ ได้ */
+/**
+ * ยิง API พร้อมแนบ LIFF access token
+ *
+ * §6: ห้ามส่ง userId ตรง ๆ เด็ดขาด ส่ง token ให้เซิร์ฟเวอร์เอาไปแลกตัวตนกับ LINE
+ * ถ้าไม่มี token (โหมดพัฒนา) ก็ยิงเปล่า ๆ แล้วเซิร์ฟเวอร์จะใช้ทางลัดแทน
+ */
 async function api(url: string, init?: RequestInit) {
-  const liff = (globalThis as { liff?: { getAccessToken?: () => string | null } }).liff;
-  const token = liff?.getAccessToken?.();
+  const token = accessToken();
   return fetch(url, {
     ...init,
     headers: {
@@ -95,6 +100,14 @@ export default function CustomerCard() {
     if (started.current) return;
     started.current = true;
     (async () => {
+      try {
+        // ต้องรอ LIFF พร้อมก่อนยิง API ไม่งั้นจะยังไม่มี token
+        await initLiff();
+      } catch {
+        setMsg("เชื่อมต่อ LINE ไม่สำเร็จ ลองเปิดใหม่อีกครั้ง");
+        setPhase("error");
+        return;
+      }
       const res = await api("/api/me/card");
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
