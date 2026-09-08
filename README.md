@@ -207,3 +207,72 @@ export CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$DATABASE_URL"
 export NEXT_PUBLIC_BASE_URL="https://<โดเมนจริง>"   # NEXT_PUBLIC_* ถูกฝังตอน build
 npm run cf:build && npx wrangler deploy
 ```
+
+
+## ขั้นตอนเชื่อมกับ LINE
+
+ทำตามลำดับนี้ ข้ามขั้นไม่ได้เพราะแต่ละขั้นต้องใช้ค่าจากขั้นก่อนหน้า
+
+### ขั้นที่ 1 — สร้าง LINE Official Account
+
+สมัครที่ LINE for Business (ฟรี) หรือสร้างจาก LINE Developers Console ก็ได้
+ใช้บัญชี LINE ส่วนตัวสมัครได้เลย ยังไม่ต้องยืนยันตัวตนธุรกิจ
+
+### ขั้นที่ 2 — สร้าง Provider
+
+ที่ [developers.line.biz](https://developers.line.biz/console/) สร้าง Provider หนึ่งอัน
+เช่นชื่อ `La-Mi` — เป็นแค่กล่องไว้ใส่ channel **ทั้งสอง channel ต้องอยู่ใน Provider เดียวกัน**
+
+### ขั้นที่ 3 — สร้าง Messaging API channel
+
+ผูกกับ LINE OA ที่สร้างไว้ในขั้นที่ 1
+
+ยังไม่ต้องเอาค่าอะไรมาใช้ตอนนี้ — จะได้ใช้ตอนทำ webhook รับรูปใบเสร็จเดลิเวอรี่
+และตอนส่งข้อความเมื่อลูกค้าถึง checkpoint
+
+### ขั้นที่ 4 — สร้าง LINE Login channel
+
+**คนละอันกับขั้นที่ 3** ตั้ง App type เป็น Web app
+
+จากหน้า Basic settings เอา **Channel ID** (ตัวเลขล้วน) มาเก็บไว้
+→ ค่านี้คือ `LINE_LOGIN_CHANNEL_ID`
+
+### ขั้นที่ 5 — สร้าง LIFF app
+
+อยู่ใน **แท็บ LIFF ของ LINE Login channel** (ขั้นที่ 4) ไม่ใช่ของ Messaging API
+
+| ช่อง | ใส่ |
+|---|---|
+| Endpoint URL | `https://<โดเมนจริง>/card` |
+| Size | `Full` |
+| Scopes | `profile` และ `openid` |
+| Scan QR | เปิด |
+
+เสร็จแล้วจะได้ **LIFF ID** หน้าตาแบบ `1656789012-AbCdEfGh` (มีขีดกลาง)
+→ ค่านี้คือ `NEXT_PUBLIC_LIFF_ID`
+
+### ขั้นที่ 6 — ใส่ค่าแล้ว deploy
+
+```bash
+npx wrangler secret put LINE_LOGIN_CHANNEL_ID      # ค่าจากขั้นที่ 4
+
+set -a && . ./.env.local && set +a
+export CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$DATABASE_URL"
+export NEXT_PUBLIC_LIFF_ID="<ค่าจากขั้นที่ 5>"
+export NEXT_PUBLIC_BASE_URL="https://<โดเมนจริง>"
+npm run cf:build && npx wrangler deploy
+```
+
+`NEXT_PUBLIC_*` ถูกฝังตอน build จึงต้องส่งตอนสั่ง build ไม่ใช่ตั้งเป็น secret
+
+### ขั้นที่ 7 — ริชเมนูและข้อความตอบกลับ
+
+ทำใน LINE OA Manager ไม่ต้องเขียนโค้ด (§14 — งานของคนที่ไม่แตะโค้ด)
+ปุ่มริชเมนูชี้ไป `https://liff.line.me/<LIFF_ID>`
+
+### จุดที่พลาดกันบ่อย
+
+- **LIFF ID กับ Channel ID เป็นคนละค่า** — LIFF ID มีขีดกลาง Channel ID เป็นตัวเลขล้วน
+- **LIFF อยู่ใต้ LINE Login ไม่ใช่ Messaging API** — สร้างผิด channel จะหาแท็บ LIFF ไม่เจอ
+- **Endpoint URL ต้องเป็น https และลงท้ายด้วย `/card`** — LINE ไม่รับ http แม้ตอนพัฒนา
+- **ต้องมีโค้ดฝั่งเว็บเรียก LIFF SDK ด้วย** — ตั้งค่าใน console อย่างเดียวไม่พอ
