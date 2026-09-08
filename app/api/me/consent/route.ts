@@ -1,14 +1,13 @@
 import { sql } from "@/lib/db";
-import { requireCustomer } from "@/lib/auth/line";
+import { requireIdentity } from "@/lib/auth/line";
 import { json, handler } from "@/lib/http";
 
-/** บันทึกการยินยอมตาม PDPA (§13) — บันทึกเวลาไว้เป็นหลักฐาน */
+/** บันทึกการยินยอมตาม PDPA (§13) */
 export async function POST(req: Request) {
   return handler(async () => {
-    const me = await requireCustomer(req);
-    await sql`
-      UPDATE customers SET consent_at = COALESCE(consent_at, now())
-       WHERE id = ${me.id}`;
-    return json({ ok: true });
+    const me = await requireIdentity(req);
+    const [row] = await sql<{ result: unknown }[]>`
+      SELECT api_consent(${me.userId}, ${me.displayName}, ${me.pictureUrl}) AS result`;
+    return json(row.result);
   });
 }

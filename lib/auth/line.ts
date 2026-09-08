@@ -42,61 +42,44 @@ export async function verifyLiffToken(token: string): Promise<LineProfile> {
   return p;
 }
 
-export interface Customer {
-  id: string;
-  line_user_id: string;
-  display_name: string | null;
-  consent_at: Date | null;
-  blocked_at: Date | null;
+/**
+ * ตัวตนลูกค้าที่ใช้ยิงเข้าฟังก์ชัน api_* ทั้งหลาย
+ *
+ * ไม่แตะฐานข้อมูลที่นี่ — การอัปเสิร์ตลูกค้าไปรวมอยู่ในคำสั่ง SQL คำสั่งเดียว
+ * กับงานจริงของแต่ละเส้นทาง (ดู db/migrations/0003_api.sql)
+ * เพราะ Workers เปิดตัวเชื่อมสองตัวในคำขอเดียวไม่ได้
+ */
+export interface LineIdentity {
+  userId: string;
+  displayName: string | null;
+  pictureUrl: string | null;
 }
 
-/**
- * หาลูกค้าจาก LINE userId ถ้ายังไม่มีให้สร้างเลย
- *
- * §4: ลูกค้าใหม่ไม่ต้องกรอกฟอร์มอะไรทั้งนั้น บัญชีเกิดเงียบ ๆ ตอนสแกนครั้งแรก
- * ส่วนบัตรใบแรกปล่อยให้ award_stamp เปิดให้เอง จะได้มีที่เดียวที่เปิดบัตร
- */
-export async function getOrCreateCustomer(p: LineProfile): Promise<Customer> {
-  const rows = await sql<Customer[]>`
-    INSERT INTO customers (line_user_id, display_name, picture_url)
-    VALUES (${p.userId}, ${p.displayName ?? null}, ${p.pictureUrl ?? null})
-    ON CONFLICT (line_user_id) DO UPDATE
-      SET display_name = COALESCE(EXCLUDED.display_name, customers.display_name),
-          picture_url  = COALESCE(EXCLUDED.picture_url,  customers.picture_url)
-    RETURNING id, line_user_id, display_name, consent_at, blocked_at`;
-
-  const c = rows[0];
-  if (c.blocked_at) throw new HttpError("account_blocked", 403);
-  return c;
-}
-
-/**
- * ทางลัดสำหรับพัฒนาเท่านั้น — ให้ทดสอบหน้าลูกค้าได้โดยยังไม่ต้องตั้ง LINE
- *
- * ต้องเป็นจริงพร้อมกันสองข้อถึงจะทำงาน:
- *   1. ไม่ได้รันแบบ production
- *   2. ตั้ง DEV_FAKE_LINE_USER ไว้ในไฟล์ env ด้วยตัวเอง
- *
- * ถ้าขาดข้อใดข้อหนึ่ง ฟังก์ชันนี้คืน null และระบบกลับไปตรวจ token ตามปกติ
- * เงื่อนไขที่หนึ่งเป็นตัวกันหลัก เพราะ NODE_ENV บน Vercel/Cloudflare
- * เป็น production เสมอ ตั้งค่าทับจากภายนอกไม่ได้
- */
-function devCustomer(): LineProfile | null {
+function devIdentity(): LineIdentity | null {
   if (process.env.NODE_ENV === "production") return null;
   const uid = process.env.DEV_FAKE_LINE_USER;
   if (!uid) return null;
-  return { userId: uid, displayName: process.env.DEV_FAKE_LINE_NAME ?? "ลูกค้าทดสอบ" };
+  return {
+    userId: uid,
+    displayName: process.env.DEV_FAKE_LINE_NAME ?? "ลูกค้าทดสอบ",
+    pictureUrl: null,
+  };
 }
 
 /** ดึงตัวตนลูกค้าจาก Authorization: Bearer <LIFF access token> */
-export async function requireCustomer(req: Request): Promise<Customer> {
+export async function requireIdentity(req: Request): Promise<LineIdentity> {
   const auth = req.headers.get("authorization");
   const token = auth?.startsWith("Bearer ") ? auth.slice(7).trim() : null;
 
   if (!token) {
-    const dev = devCustomer();
-    if (dev) return getOrCreateCustomer(dev);
+    const dev = devIdentity();
+    if (dev) return dev;
     throw new HttpError("unauthenticated", 401);
   }
-  return getOrCreateCustomer(await verifyLiffToken(token));
+  const p = await verifyLiffToken(token);
+  return {
+    userId: p.userId,
+    displayName: p.displayName ?? null,
+    pictureUrl: p.pictureUrl ?? null,
+  };
 }

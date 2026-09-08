@@ -1,13 +1,13 @@
 import { sql } from "@/lib/db";
-import { requireCustomer } from "@/lib/auth/line";
+import { requireIdentity } from "@/lib/auth/line";
 import { json, handler } from "@/lib/http";
 
-/** สถานะบัตรของลูกค้า — คืนข้อมูล "พร้อมวาด" ทั้งหมด (§14) */
+/** สถานะบัตร — อัปเสิร์ตลูกค้าและอ่านบัตรในคำสั่งเดียว (ดู 0003_api.sql) */
 export async function GET(req: Request) {
   return handler(async () => {
-    const me = await requireCustomer(req);
-    const [row] = await sql<{ state: unknown }[]>`
-      SELECT get_card_state(${me.id}) AS state`;
-    return json({ ok: true, ...(row.state as object), consented: !!me.consent_at });
+    const me = await requireIdentity(req);
+    const [row] = await sql<{ result: { ok: boolean } }[]>`
+      SELECT api_get_card(${me.userId}, ${me.displayName}, ${me.pictureUrl}) AS result`;
+    return json(row.result, row.result.ok ? 200 : 403);
   });
 }

@@ -177,3 +177,33 @@ WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$DATABASE_URL" npm run c
 
 > ในโหมดนี้ `NODE_ENV` เป็น production ทางลัด `DEV_FAKE_LINE_USER` จึงปิดเอง
 > หน้าลูกค้าจะตอบ `unauthenticated` ซึ่งถูกต้องแล้ว
+
+
+## ข้อควรรู้เมื่อรันบน Cloudflare Workers
+
+สี่เรื่องนี้ทำให้เสียเวลาไปมากตอนขึ้นครั้งแรก บันทึกไว้กันลืม
+
+**1. Hyperdrive ต้องชี้ไป session pooler (พอร์ต 5432) ไม่ใช่ transaction pooler (6543)**
+ถ้าชี้ไป 6543 จะกลายเป็น pooler ซ้อน pooler แล้ว Hyperdrive จะปิดคอนเนกชันทิ้ง
+อาการคือ `write CONNECTION_CLOSED ...hyperdrive.local` แบบสุ่ม ๆ
+
+**2. หนึ่งคำขอต้องยิง SQL คำสั่งเดียว**
+Workers ผูก I/O ไว้กับคำขอที่สร้างมัน เปิดตัวเชื่อมสองตัวในคำขอเดียวจะล้มเหลว
+ตรรกะที่ต้องยิงหลายคำสั่งจึงรวมไว้เป็นฟังก์ชันเดียวใน `db/migrations/0003_api.sql`
+
+**3. PBKDF2 เกิน 100,000 รอบไม่ได้**
+Workers ปฏิเสธค่าที่สูงกว่านั้น และ hash เดิมฝังเลขรอบไว้ในตัว
+ถ้าเปลี่ยนค่านี้ต้องออก PIN ใหม่ให้พนักงานทุกคน
+
+**4. ห้ามใช้ `require()` อ่าน binding**
+ในบันเดิลของ Worker `require` ใช้ไม่ได้ แล้วจะเงียบ ๆ ตกไปใช้ `DATABASE_URL`
+ที่ถูกฝังตอน build ทำให้ต่อฐานข้อมูลตรงโดยไม่ผ่าน Hyperdrive แล้วค้าง
+
+### deploy
+
+```bash
+set -a && . ./.env.local && set +a
+export CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$DATABASE_URL"
+export NEXT_PUBLIC_BASE_URL="https://<โดเมนจริง>"   # NEXT_PUBLIC_* ถูกฝังตอน build
+npm run cf:build && npx wrangler deploy
+```
