@@ -20,8 +20,7 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      // แทนที่ด้วย id จริงหลังรัน: npx wrangler hyperdrive create ...
-      "id": "PLACEHOLDER_ใส่หลังสร้าง"
+      "id": "c4b4122731d24b8f85617e14ff8b0974"
       // ตอนรัน preview บนเครื่อง ส่ง connection string ทางตัวแปรแวดล้อมแทน
       // WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=...
     }
