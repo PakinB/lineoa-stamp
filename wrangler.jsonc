@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lami-stamp",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-01",
+
+  // Next.js ต้องการ Node API หลายตัว ไม่เปิด flag นี้จะ build ไม่ผ่าน
+  "compatibility_flags": ["nodejs_compat"],
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  "observability": { "enabled": true },
+
+  // ต่อ Supabase ผ่าน Hyperdrive เพราะ Worker เปิด connection ค้างไว้ไม่ได้
+  // Hyperdrive จัดการ pool ให้ แล้วเราใช้ไดรเวอร์ postgres.js เดิมได้เลย
+  // id จะได้หลังรัน: npx wrangler hyperdrive create ...
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      // แทนที่ด้วย id จริงหลังรัน: npx wrangler hyperdrive create ...
+      "id": "PLACEHOLDER_ใส่หลังสร้าง"
+      // ตอนรัน preview บนเครื่อง ส่ง connection string ทางตัวแปรแวดล้อมแทน
+      // WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=...
+    }
+  ]
+}

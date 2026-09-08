@@ -38,6 +38,7 @@ npm run dev
 | เว็บพนักงาน | ✅ เสร็จ — เข้ากะ · ออก QR · รับรางวัล · สรุปกะ |
 | หน้าจอลูกค้า | ✅ เสร็จ — บัตร · ผลสแกน · เลือกรางวัล · ยินยอม PDPA |
 | หน้าแอดมิน + คิวอนุมัติเดลิเวอรี่ | ⬜ ยังไม่เริ่ม |
+| ตั้งค่า deploy ขึ้น Cloudflare | ✅ พร้อม รอบัญชี Cloudflare |
 | LINE webhook รับรูปใบเสร็จ | ⬜ ยังไม่เริ่ม |
 
 ## ทดสอบตรรกะแกนโดยยังไม่มีหน้าเว็บ
@@ -141,3 +142,38 @@ Postgres มาตรฐาน ไม่ได้ใช้ Supabase SDK สั�
   `image_hash` ไม่ใช่ตัวไฟล์
 - **project หยุดเองเมื่อไม่มีการใช้งานราวหนึ่งสัปดาห์** — ร้านที่เปิดจริงทุกวัน
   ไม่เจอปัญหานี้ แต่ระหว่างพัฒนาที่ทิ้งไว้นาน ๆ อาจต้องเข้าไปกดปลุกก่อน
+
+
+## deploy ขึ้น Cloudflare Workers
+
+ตั้งค่าไว้ครบแล้ว เหลือขั้นที่ต้องใช้บัญชีจริง
+
+```bash
+npx wrangler login                    # เปิดเบราว์เซอร์ให้ยืนยันตัวตน
+
+# สร้าง Hyperdrive ชี้ไป Supabase (เอา DATABASE_URL จาก .env.local มาใส่)
+npx wrangler hyperdrive create lami-db --connection-string="postgresql://..."
+# เอา id ที่ได้ไปแทน PLACEHOLDER ใน wrangler.jsonc
+
+# ใส่ค่าลับ (ไม่เก็บในไฟล์)
+npx wrangler secret put SESSION_SECRET
+npx wrangler secret put LINE_LOGIN_CHANNEL_ID
+
+npm run cf:deploy
+```
+
+ค่าที่ขึ้นต้นด้วย `NEXT_PUBLIC_` ต้องมีตอน build ไม่ใช่ตอนรัน จึงใส่ใน
+`.env.local` หรือส่งเป็นตัวแปรแวดล้อมตอนสั่ง `cf:build`
+
+### ทดลองรันในรันไทม์ของ Workers บนเครื่องก่อน
+
+```bash
+set -a && . ./.env.local && set +a
+WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$DATABASE_URL" npm run cf:preview
+```
+
+เปิด `localhost:8787` — ตัวนี้รันด้วยเครื่องยนต์เดียวกับของจริง ใช้ตรวจว่า
+โค้ดทำงานบน Workers ได้ก่อนจะ deploy จริง
+
+> ในโหมดนี้ `NODE_ENV` เป็น production ทางลัด `DEV_FAKE_LINE_USER` จึงปิดเอง
+> หน้าลูกค้าจะตอบ `unauthenticated` ซึ่งถูกต้องแล้ว

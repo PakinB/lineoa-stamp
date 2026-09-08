@@ -11,7 +11,10 @@
     "db:seed": "node scripts/psql.mjs -f db/seed.sql",
     "db:reset": "node scripts/psql.mjs -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' && npm run db:migrate && npm run db:seed",
     "db:psql": "node scripts/psql.mjs",
-    "staff:add": "node scripts/create-staff.mjs"
+    "staff:add": "node scripts/create-staff.mjs",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@line/bot-sdk": "^9.5.0",
@@ -22,10 +25,12 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.6",
     "@types/node": "^22.10.0",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "wrangler": "^4.129.1"
   }
 }
