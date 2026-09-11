@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { sql } from "@/lib/db";
+import DailyQrSummary, { DailyStatItem } from "@/components/DailyQrSummary";
 
 interface Stats {
   stamps_today: number;
@@ -9,6 +11,7 @@ interface Stats {
   rewards_pending: number;
   tokens_today: number;
   tokens_used: number;
+  daily_stats: DailyStatItem[];
   recent_activity: {
     id: number;
     slot_no: number;
@@ -36,6 +39,40 @@ export default async function AdminDashboard() {
 
   return (
     <div className="stack" style={{ gap: 16 }}>
+      {/* ทางลัดออก QR หน้าร้านสำหรับเจ้าของร้าน */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <Link
+          href="/staff/stamp"
+          className="btn"
+          style={{
+            textDecoration: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "12px 14px",
+            fontSize: 15,
+          }}
+        >
+          <span>⚡</span> ออก QR สะสมแต้ม
+        </Link>
+        <Link
+          href="/staff/reward"
+          className="btn ghost"
+          style={{
+            textDecoration: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "12px 14px",
+            fontSize: 15,
+          }}
+        >
+          <span>🎁</span> ออก QR รับรางวัล
+        </Link>
+      </div>
+
       {/* สถิติประจำวัน */}
       <div>
         <h2 style={{ fontSize: 16, margin: "0 0 10px", color: "var(--muted)" }}>วันนี้ (Today)</h2>
@@ -80,6 +117,9 @@ export default async function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* สรุปรายวัน + Export Excel */}
+      <DailyQrSummary dailyStats={d.daily_stats || []} />
 
       {/* สถิติสะสม */}
       <div className="card">

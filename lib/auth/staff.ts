@@ -165,9 +165,7 @@ export async function requireStaff(minRole: "staff" | "manager" | "owner" = "sta
   return sess;
 }
 
-/** สาขาที่เซสชันนี้ทำงานอยู่ — owner ไม่ผูกสาขา ต้องระบุมาเอง */
-export async function branchOf(sess: StaffSession, given?: string | null): Promise<string> {
-  const b = sess.bid ?? given ?? null;
-  if (!b) throw new HttpError("branch_required", 400);
-  return b;
+/** สาขาที่เซสชันนี้ทำงานอยู่ — ถ้าเป็น owner ที่ไม่ได้ผูกสาขา ให้เป็น null แล้วให้ DB เลือกสาขาหลักอัตโนมัติ */
+export async function branchOf(sess: StaffSession, given?: string | null): Promise<string | null> {
+  return sess.bid ?? given ?? null;
 }

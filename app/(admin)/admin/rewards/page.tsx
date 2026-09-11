@@ -2,40 +2,30 @@
 
 import { useEffect, useState } from "react";
 
-interface RewardOption {
-  id: string;
-  name: string;
-  sort: number;
-  is_active: boolean;
-  used_count: number;
-}
-
-interface CheckpointItem {
-  id: string;
+interface SlotReward {
   slot_no: number;
   label: string;
   is_active: boolean;
-  options: RewardOption[];
+  checkpoint_id: string | null;
 }
 
 export default function RewardsManagement() {
-  const [checkpoints, setCheckpoints] = useState<CheckpointItem[]>([]);
+  const [slots, setSlots] = useState<SlotReward[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
-
-  // Modal State for adding new option
-  const [addingCheckpoint, setAddingCheckpoint] = useState<CheckpointItem | null>(null);
-  const [newOptionName, setNewOptionName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
   async function loadData() {
     try {
       setLoading(true);
+      setErr("");
       const res = await fetch("/api/admin/rewards");
       if (res.ok) {
-        const d = (await res.json()) as { ok: boolean; checkpoints: CheckpointItem[] };
-        setCheckpoints(d.checkpoints || []);
+        const d = (await res.json()) as { ok: boolean; slots: SlotReward[] };
+        setSlots(d.slots || []);
+      } else {
+        setErr("โหลดข้อมูลของรางวัลไม่สำเร็จ");
       }
     } catch {
       setErr("โหลดข้อมูลของรางวัลไม่สำเร็จ");
@@ -48,177 +38,167 @@ export default function RewardsManagement() {
     loadData();
   }, []);
 
-  async function toggleOption(option: RewardOption) {
-    const nextState = !option.is_active;
-    try {
-      const res = await fetch(`/api/admin/rewards/${option.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ is_active: nextState }),
-      });
-      if (res.ok) {
-        setMsg(nextState ? `เปิด "${option.name}" เรียบร้อยแล้ว` : `ปิด "${option.name}" (ของหมดชั่วคราว)`);
-        loadData();
-      }
-    } catch {
-      setErr("ปรับปรุงสถานะของรางวัลไม่สำเร็จ");
-    }
+  function handleLabelChange(slot_no: number, newLabel: string) {
+    setSlots((prev) =>
+      prev.map((s) =>
+        s.slot_no === slot_no ? { ...s, label: newLabel, is_active: newLabel.trim().length > 0 } : s
+      )
+    );
   }
 
-  async function handleAddOption(e: React.FormEvent) {
-    e.preventDefault();
-    if (!addingCheckpoint || !newOptionName.trim()) return;
+  function handleClearSlot(slot_no: number) {
+    handleLabelChange(slot_no, "");
+  }
 
-    setSubmitting(true);
+  async function handleSaveAll(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setMsg("");
     setErr("");
+
     try {
       const res = await fetch("/api/admin/rewards", {
-        method: "POST",
+        method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          checkpoint_id: addingCheckpoint.id,
-          name: newOptionName.trim(),
+          slots: slots.map((s) => ({
+            slot_no: s.slot_no,
+            label: s.label.trim(),
+          })),
         }),
       });
+
       if (res.ok) {
-        setMsg(`เพิ่มตัวเลือก "${newOptionName}" ในช่องที่ ${addingCheckpoint.slot_no} สำเร็จ`);
-        setAddingCheckpoint(null);
-        setNewOptionName("");
-        loadData();
+        const d = (await res.json()) as { ok: boolean; slots: SlotReward[] };
+        setSlots(d.slots || []);
+        setMsg("✓ บันทึกข้อความของรางวัลทั้ง 10 ช่องเรียบร้อยแล้ว");
+      } else {
+        setErr("บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
       }
     } catch {
-      setErr("เพิ่มตัวเลือกรางวัลไม่สำเร็จ");
+      setErr("บันทึกไม่สำเร็จ เกิดข้อผิดพลาดในการเชื่อมต่อ");
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   }
 
   return (
     <div className="stack" style={{ gap: 16 }}>
-      <div>
-        <h2 style={{ fontSize: 18, margin: 0 }}>ของรางวัล & Checkpoints</h2>
-        <span style={{ fontSize: 13, color: "var(--muted)" }}>
-          ควบคุมรายการของรางวัล เมื่อของหมดสามารถปิดชั่วคราวได้ทันที ลูกค้าจะไม่เห็นตัวเลือกนั้น
-        </span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h2 style={{ fontSize: 18, margin: 0 }}>🎁 กำหนดของรางวัล (ช่องที่ 1 - 10)</h2>
+          <span style={{ fontSize: 13, color: "var(--muted)" }}>
+            ระบุข้อความของรางวัลสำหรับแต่ละช่องสะสม หากช่องไหนไม่มีรางวัลให้เว้นว่างไว้
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSaveAll}
+          className="btn"
+          disabled={loading || saving}
+          style={{ width: "auto", padding: "10px 20px" }}
+        >
+          {saving ? "กำลังบันทึก…" : "💾 บันทึกทั้งหมด"}
+        </button>
       </div>
 
-      {msg && <div className="card" style={{ background: "var(--ok-bg)", borderColor: "#CDE3CB", padding: "12px 16px", color: "var(--ok)", fontSize: 14, fontWeight: 600 }}>{msg}</div>}
+      {msg && (
+        <div className="card" style={{ background: "var(--ok-bg)", borderColor: "#CDE3CB", padding: "12px 16px", color: "var(--ok)", fontSize: 14, fontWeight: 600 }}>
+          {msg}
+        </div>
+      )}
       {err && <p className="err">{err}</p>}
 
       {loading ? (
         <p className="hint">กำลังโหลดรายการของรางวัล…</p>
       ) : (
-        <div className="stack" style={{ gap: 14 }}>
-          {checkpoints.map((c) => (
-            <div key={c.id} className="card" style={{ padding: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 15, fontWeight: 700, background: "var(--ground)", padding: "2px 8px", borderRadius: 6 }}>
-                      ช่องที่ {c.slot_no}
-                    </span>
-                    <span style={{ fontSize: 17, fontWeight: 700 }}>{c.label}</span>
-                  </div>
-                </div>
-                <button
-                  className="btn ghost small"
-                  style={{ width: "auto", padding: "6px 10px", fontSize: 12 }}
-                  onClick={() => {
-                    setAddingCheckpoint(c);
-                    setNewOptionName("");
+        <form onSubmit={handleSaveAll} className="stack" style={{ gap: 10 }}>
+          {slots.map((s) => {
+            const hasReward = s.label.trim().length > 0;
+            return (
+              <div
+                key={s.slot_no}
+                className="card"
+                style={{
+                  padding: "14px 16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  borderColor: hasReward ? "var(--brand)" : "var(--line)",
+                  background: hasReward ? "#FDFDFD" : "#FAFAFA",
+                }}
+              >
+                <div
+                  style={{
+                    minWidth: 76,
+                    padding: "6px 10px",
+                    borderRadius: 8,
+                    background: hasReward ? "var(--brand)" : "#E2E8F0",
+                    color: hasReward ? "#FFFFFF" : "#64748B",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    textAlign: "center",
+                    flexShrink: 0,
                   }}
                 >
-                  ➕ เพิ่มตัวเลือก
-                </button>
-              </div>
-
-              {c.options.length === 0 ? (
-                <p className="hint" style={{ textAlign: "left" }}>ยังไม่มีตัวเลือกของรางวัลในจุดนี้</p>
-              ) : (
-                <div className="stack" style={{ gap: 8 }}>
-                  {c.options.map((opt) => (
-                    <div
-                      key={opt.id}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "10px 12px",
-                        background: opt.is_active ? "#FAFAFA" : "#FFF5F5",
-                        borderRadius: 10,
-                        border: opt.is_active ? "1px solid var(--line)" : "1px solid #FFD0D0",
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600, color: opt.is_active ? "var(--ink)" : "var(--muted)" }}>
-                          {opt.name}
-                        </div>
-                        <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                          มอบให้ลูกค้าไปแล้ว {opt.used_count} ครั้ง
-                        </div>
-                      </div>
-
-                      <button
-                        className="btn small"
-                        style={{
-                          width: "auto",
-                          padding: "6px 14px",
-                          fontSize: 13,
-                          background: opt.is_active ? "var(--ok)" : "var(--stamp)",
-                          borderRadius: 8,
-                        }}
-                        onClick={() => toggleOption(opt)}
-                      >
-                        {opt.is_active ? "✓ มีของ (เปิด)" : "⛔ ของหมด (ปิด)"}
-                      </button>
-                    </div>
-                  ))}
+                  ช่อง {s.slot_no}
                 </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
 
-      {/* Modal เพิ่มตัวเลือกของรางวัล */}
-      {addingCheckpoint && (
-        <div className="modal-backdrop">
-          <div className="modal-box">
-            <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>
-              ➕ เพิ่มตัวเลือกรางวัล (ช่องที่ {addingCheckpoint.slot_no})
-            </h3>
-            <form onSubmit={handleAddOption} className="stack" style={{ gap: 14 }}>
-              <div className="form-group">
-                <label>ชื่อของรางวัล *</label>
-                <input
-                  type="text"
-                  className="input-text"
-                  placeholder="เช่น สไปรท์ฟรี 1 กระป๋อง"
-                  value={newOptionName}
-                  onChange={(e) => setNewOptionName(e.target.value)}
-                  required
-                />
-                <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                  ตัวเลือกนี้จะแสดงให้ลูกค้าเลือกได้เมื่อสแกนรับรางวัลที่ช่องนี้
-                </span>
-              </div>
+                <div style={{ flex: 1, position: "relative" }}>
+                  <input
+                    type="text"
+                    className="input-text"
+                    style={{
+                      paddingRight: hasReward ? 36 : 12,
+                      fontWeight: hasReward ? 600 : 400,
+                      color: hasReward ? "var(--ink)" : "var(--muted)",
+                    }}
+                    placeholder={`ไม่มีรางวัลในช่องที่ ${s.slot_no} (เว้นว่างไว้)`}
+                    value={s.label}
+                    onChange={(e) => handleLabelChange(s.slot_no, e.target.value)}
+                  />
+                  {hasReward && (
+                    <button
+                      type="button"
+                      onClick={() => handleClearSlot(s.slot_no)}
+                      style={{
+                        position: "absolute",
+                        right: 10,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "var(--muted)",
+                        fontSize: 14,
+                        padding: 4,
+                      }}
+                      title="ล้างข้อความ"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
 
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="btn ghost small"
-                  onClick={() => setAddingCheckpoint(null)}
-                  disabled={submitting}
-                >
-                  ยกเลิก
-                </button>
-                <button type="submit" className="btn small" disabled={submitting}>
-                  {submitting ? "กำลังบันทึก…" : "เพิ่มตัวเลือก"}
-                </button>
+                <div style={{ fontSize: 13, color: hasReward ? "var(--brand)" : "var(--muted)", minWidth: 70, textAlign: "right", flexShrink: 0 }}>
+                  {hasReward ? "🎁 มีรางวัล" : "⚪ ว่าง"}
+                </div>
               </div>
-            </form>
+            );
+          })}
+
+          <div style={{ marginTop: 8 }}>
+            <button
+              type="submit"
+              className="btn"
+              disabled={loading || saving}
+              style={{ width: "100%", padding: "14px" }}
+            >
+              {saving ? "กำลังบันทึก…" : "💾 บันทึกของรางวัลทั้งหมด (1-10)"}
+            </button>
           </div>
-        </div>
+        </form>
       )}
     </div>
   );

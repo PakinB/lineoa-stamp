@@ -14,6 +14,24 @@ export async function GET() {
   });
 }
 
+/** บันทึกของรางวัลทั้ง 1-10 ช่อง */
+export async function PUT(req: Request) {
+  return handler(async () => {
+    await requireStaff("owner");
+
+    const body = (await req.json()) as {
+      slots?: { slot_no: number; label: string }[];
+    };
+
+    if (!Array.isArray(body.slots)) return fail("slots_array_required", 400);
+
+    const [row] = await sql<{ result: unknown }[]>`
+      SELECT api_admin_save_all_rewards(${JSON.stringify(body.slots)}) AS result`;
+
+    return json(row.result);
+  });
+}
+
 /** เพิ่มตัวเลือกรางวัลใหม่ใน checkpoint */
 export async function POST(req: Request) {
   return handler(async () => {
