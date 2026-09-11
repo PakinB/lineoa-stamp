@@ -60,11 +60,82 @@ interface StaffRow {
   role: "staff" | "manager" | "owner"; pin_hash: string;
 }
 
+export interface StaffAuthResult {
+  token: string;
+  staff: {
+    id: string;
+    name: string;
+    role: "staff" | "manager" | "owner";
+    branch_id: string | null;
+  };
+}
+
 /**
- * ล็อกอินด้วย PIN
+ * ล็อกอินด้วยการเลือกชื่อ + PIN 6 หลัก
  *
- * ไม่มีชื่อผู้ใช้ — ไล่เทียบ PIN กับพนักงานทุกคนที่ยังไม่ถูกเพิกถอน
- * แลกความสะดวกหน้าร้านกับการที่ PIN ต้องไม่ซ้ำกันในระบบ (ตรวจตอนสร้าง)
+ * 1. ตรวจสอบว่าถูกระงับ (locked_until) หรือไม่
+ * 2. พนักงาน (staff) อนุญาตให้ล็อกอินได้เฉพาะช่วงเวลาทำงาน 11:00 - 22:00 น.
+ * 3. บันทึก failed_attempts เมื่อใส่ผิด หากถึงเพดานจะล็อกบัญชี 15 นาที
+ */
+export async function loginWithStaffPin(staffId: string, pin: string): Promise<StaffAuthResult> {
+  if (!/^\d{6}$/.test(pin)) throw new HttpError("invalid_pin", 400);
+
+  const [row] = await sql<{
+    result: {
+      ok: boolean;
+      id: string;
+      name: string;
+      role: "staff" | "manager" | "owner";
+      branch_id: string | null;
+      pin_hash: string;
+      failed_attempts: number;
+      is_locked: boolean;
+      locked_until: string | null;
+      shift_start: number;
+      shift_end: number;
+      is_working_hours: boolean;
+      max_attempts: number;
+      lockout_minutes: number;
+      reason?: string;
+    };
+  }[]>`SELECT api_staff_auth_info(${staffId}) AS result`;
+
+  const info = row?.result;
+  if (!info || !info.ok) throw new HttpError("staff_not_found", 404);
+
+  if (info.is_locked) throw new HttpError("account_locked", 403);
+
+  // พนักงาน (role === 'staff') เข้ากะได้เฉพาะเวลาทำงาน 11:00 - 22:00 น.
+  if (info.role === "staff" && !info.is_working_hours) {
+    throw new HttpError("outside_working_hours", 403);
+  }
+
+  const ok = await checkPin(pin, info.pin_hash);
+  if (!ok) {
+    await sql`SELECT api_staff_record_login_failure(${staffId})`;
+    throw new HttpError("invalid_pin", 401);
+  }
+
+  if (info.failed_attempts > 0) {
+    await sql`SELECT api_staff_record_login_success(${staffId})`;
+  }
+
+  const hours = 14;
+  const sess: StaffSession = {
+    sid: info.id,
+    bid: info.branch_id,
+    role: info.role,
+    exp: Math.floor(Date.now() / 1000) + hours * 3600,
+  };
+
+  return {
+    token: await signSession(sess),
+    staff: { id: info.id, name: info.name, role: info.role, branch_id: info.branch_id },
+  };
+}
+
+/**
+ * ล็อกอินด้วย PIN อย่างเดียว (คงไว้สำหรับ backward compatibility)
  */
 export async function loginWithPin(pin: string): Promise<{ token: string; staff: StaffRow }> {
   if (!/^\d{6}$/.test(pin)) throw new HttpError("invalid_pin", 401);
@@ -75,7 +146,7 @@ export async function loginWithPin(pin: string): Promise<{ token: string; staff:
 
   for (const s of rows) {
     if (await checkPin(pin, s.pin_hash)) {
-      const hours = 14; // ครอบคลุมหนึ่งกะเต็ม ไม่ต้องใส่ PIN ซ้ำทุกบิล
+      const hours = 14;
       const sess: StaffSession = {
         sid: s.id, bid: s.branch_id, role: s.role,
         exp: Math.floor(Date.now() / 1000) + hours * 3600,

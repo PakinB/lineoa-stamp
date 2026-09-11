@@ -30,9 +30,16 @@ export default async function Home() {
         </Link>
       </div>
 
-      <Link href="/staff/summary" className="btn ghost small" style={{ textDecoration: "none" }}>
-        สรุปกะวันนี้
-      </Link>
+      <div className="stack" style={{ gap: 8 }}>
+        <Link href="/staff/summary" className="btn ghost small" style={{ textDecoration: "none" }}>
+          สรุปกะวันนี้
+        </Link>
+        {sess.role === "owner" && (
+          <Link href="/admin" className="btn ghost small" style={{ textDecoration: "none", color: "var(--brand-d)" }}>
+            ⚙️ ระบบจัดการร้าน (Admin)
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
