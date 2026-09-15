@@ -25,9 +25,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <div className="who">สิทธิ์เจ้าของร้าน · บัตรสะสม La-Mi</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <Link href="/staff" className="btn ghost small" style={{ width: "auto", textDecoration: "none" }}>
+          {/* ใช้ document navigation เพื่อไม่ใช้ App Router cache ที่อาจเคยเก็บ redirect ก่อนล็อกอิน */}
+          <a href="/staff" className="btn ghost small" style={{ width: "auto", textDecoration: "none" }}>
             หน้าร้าน
-          </Link>
+          </a>
           <LogoutButton />
         </div>
       </div>

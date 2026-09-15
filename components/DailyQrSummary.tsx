@@ -1,7 +1,40 @@
 "use client";
 
 import { useState } from "react";
-import * as XLSX from "xlsx";
+
+interface XlsxModule {
+  utils: {
+    aoa_to_sheet: (rows: unknown[][]) => { [key: string]: unknown };
+    book_new: () => unknown;
+    book_append_sheet: (book: unknown, sheet: unknown, name: string) => void;
+  };
+  writeFile: (book: unknown, filename: string) => void;
+}
+
+declare global {
+  // SheetJS ถูกโหลดเฉพาะใน browser ตอนกด export เพื่อไม่ให้เข้า Worker bundle
+  var XLSX: XlsxModule | undefined;
+}
+
+const XLSX_CDN = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+
+function loadXlsx(): Promise<XlsxModule> {
+  if (globalThis.XLSX) return Promise.resolve(globalThis.XLSX);
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${XLSX_CDN}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => globalThis.XLSX ? resolve(globalThis.XLSX) : reject(new Error("XLSX ไม่พร้อมใช้งาน")), { once: true });
+      existing.addEventListener("error", () => reject(new Error("โหลด XLSX ไม่สำเร็จ")), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = XLSX_CDN;
+    script.async = true;
+    script.onload = () => globalThis.XLSX ? resolve(globalThis.XLSX) : reject(new Error("XLSX ไม่พร้อมใช้งาน"));
+    script.onerror = () => reject(new Error("โหลด XLSX ไม่สำเร็จ"));
+    document.head.appendChild(script);
+  });
+}
 
 export interface DailyStatItem {
   date: string;
@@ -12,12 +45,27 @@ export interface DailyStatItem {
   rate: number;
 }
 
-export default function DailyQrSummary({ dailyStats }: { dailyStats: DailyStatItem[] }) {
+export interface DailyLineScanItem {
+  date: string;
+  date_th: string;
+  line_name: string;
+  qr_scans: number;
+}
+
+export default function DailyQrSummary({
+  dailyStats,
+  dailyLineScans,
+}: {
+  dailyStats: DailyStatItem[];
+  dailyLineScans: DailyLineScanItem[];
+}) {
   const [downloading, setDownloading] = useState(false);
 
-  function handleExportExcel() {
+  async function handleExportExcel() {
     try {
       setDownloading(true);
+      // โหลดเฉพาะ browser ตอนกด export: ไม่ให้โค้ด Excel เข้า Worker /card
+      const XLSX = await loadXlsx();
 
       const rows = [
         ["วันที่", "QR ที่พนักงานออก (ใบ)", "ลูกค้าสแกนสำเร็จ (ใบ)", "ออกแล้วไม่มีคนสแกน (ใบ)", "อัตราการสแกนสำเร็จ (%)"],
@@ -44,6 +92,15 @@ export default function DailyQrSummary({ dailyStats }: { dailyStats: DailyStatIt
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "สรุปการออก QR รายวัน");
 
+      // แยกชีตเพื่อให้หนึ่งบัญชี LINE มีได้หลายแถวตามวัน โดยไม่ทำให้สรุปรายวันอ่านยาก
+      const lineRows = [
+        ["วันที่", "ชื่อ LINE", "จำนวน QR ที่สแกนสำเร็จ (ใบ)"],
+        ...dailyLineScans.map((scan) => [scan.date, scan.line_name, scan.qr_scans]),
+      ];
+      const lineWs = XLSX.utils.aoa_to_sheet(lineRows);
+      lineWs["!cols"] = [{ wch: 14 }, { wch: 30 }, { wch: 30 }];
+      XLSX.utils.book_append_sheet(wb, lineWs, "สแกนรายบัญชี LINE");
+
       const today = new Date().toISOString().slice(0, 10);
       XLSX.writeFile(wb, `สรุปการออกQR_รายวัน_${today}.xlsx`);
     } catch (err) {
@@ -69,7 +126,7 @@ export default function DailyQrSummary({ dailyStats }: { dailyStats: DailyStatIt
         <div>
           <h3 style={{ fontSize: 16, margin: 0 }}>📑 สรุปการออก QR รายวัน (Daily Report)</h3>
           <span style={{ fontSize: 12, color: "var(--muted)" }}>
-            สถิติ QR ที่ออก, สแกนสำเร็จ, ไม่ได้สแกน และอัตราความสำเร็จ
+            สถิติ QR ที่ออก, สแกนสำเร็จ, ไม่ได้สแกน และรายชื่อ LINE ในไฟล์ Excel
           </span>
         </div>
 

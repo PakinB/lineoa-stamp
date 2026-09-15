@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { cookies, headers } from "next/headers";
+import { sql } from "@/lib/db";
+import { branchOf, requireStaff } from "@/lib/auth/staff";
 
 interface Summary {
   qr_issued: number;
@@ -9,65 +10,100 @@ interface Summary {
 }
 
 /**
- * สรุปกะ
- *
- * §4: ตัวเลข "ออกแล้วไม่มีคนสแกน" คือสัญญาณที่มีค่าที่สุด
- * ถ้าสูงผิดปกติแปลว่าพนักงานกดออก QR แล้วไม่ได้ยื่นให้ลูกค้าจริง
- * หรือยื่นแล้วลูกค้าไม่สนใจ ทั้งสองกรณีต้องแก้ที่หน้าร้าน ไม่ใช่ที่ระบบ
+ * เรียก DB โดยตรงหนึ่งคำสั่ง แทนการ fetch API ของตัวเองจาก Server Component
+ * เพราะ Worker อาจส่ง cookie/runtime context ไม่ครบระหว่าง self-fetch ได้
  */
 export default async function Page() {
-  const h = await headers();
-  const jar = await cookies();
-  const base = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
-  const res = await fetch(`${base}/api/staff/summary`, {
-    headers: { cookie: jar.toString() },
-    cache: "no-store",
-  });
-  const d = (await res.json()) as Summary & { ok: boolean };
+  const sess = await requireStaff();
+  const branchId = await branchOf(sess);
 
-  const rate = d.qr_issued > 0 ? Math.round((d.qr_claimed / d.qr_issued) * 100) : null;
+  let data: Summary | null = null;
+  try {
+    const [row] = await sql<{ result: Summary }[]>`
+      SELECT api_shift_summary(${branchId}) AS result`;
+    data = row?.result ?? null;
+  } catch (error) {
+    console.error("Unable to load staff shift summary", error);
+  }
+
+  if (!data) {
+    return (
+      <div className="screen">
+        <div className="topbar"><h1>สรุปกะวันนี้</h1></div>
+        <div className="grow center" style={{ gap: 12 }}>
+          <div className="card" style={{ width: "100%", textAlign: "center" }}>
+            <p className="big" style={{ fontSize: 24 }}>ยังโหลดสรุปกะไม่ได้</p>
+            <p className="hint" style={{ marginTop: 8 }}>ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง</p>
+          </div>
+        </div>
+        <Link href="/staff" className="btn" style={{ textDecoration: "none" }}>กลับหน้าหลัก</Link>
+      </div>
+    );
+  }
+
+  const issued = Number(data.qr_issued) || 0;
+  const claimed = Number(data.qr_claimed) || 0;
+  const unclaimed = Math.max(0, Number(data.qr_unclaimed) || 0);
+  const rate = issued > 0 ? Math.round((claimed / issued) * 100) : 0;
+  const rewards = Array.isArray(data.rewards_given) ? data.rewards_given : [];
 
   return (
     <div className="screen">
       <div className="topbar">
-        <h1>สรุปกะวันนี้</h1>
-        <Link href="/staff" className="btn ghost small" style={{ width: "auto", textDecoration: "none" }}>
-          ปิด
-        </Link>
-      </div>
-
-      <div className="card stack" style={{ gap: 0 }}>
-        <div className="rows">
-          <div className="row"><span>QR ที่ออก</span><b>{d.qr_issued}</b></div>
-          <div className="row"><span>ลูกค้าสแกนแล้ว</span><b>{d.qr_claimed}</b></div>
-          <div className={`row${d.qr_unclaimed > 0 ? " flag" : ""}`}>
-            <span>ออกแล้วไม่มีคนสแกน</span><b>{d.qr_unclaimed}</b>
-          </div>
+        <div>
+          <h1>สรุปกะวันนี้</h1>
+          <div className="who">เฉพาะสาขาที่กำลังเข้ากะ</div>
         </div>
+        <Link href="/staff" className="btn ghost small" style={{ width: "auto", textDecoration: "none" }}>ปิด</Link>
       </div>
 
-      {rate !== null && (
-        <p className="hint" style={{ marginTop: 14 }}>
-          อัตราการสแกน {rate}%
-          {rate < 30 && " — ต่ำกว่าที่ควร ลองดูว่าได้ยื่น QR ให้ลูกค้าทุกบิลหรือเปล่า"}
-        </p>
-      )}
+      <section className="card" style={{ padding: 22, background: "linear-gradient(135deg, #EAF4FA, #FFFFFF)" }}>
+        <p className="hint" style={{ textAlign: "left", fontWeight: 600 }}>อัตราการสแกน QR</p>
+        <div style={{ display: "flex", alignItems: "end", gap: 8, marginTop: 2 }}>
+          <strong style={{ fontSize: 52, lineHeight: 1, color: "var(--brand)", fontVariantNumeric: "tabular-nums" }}>{rate}%</strong>
+          <span style={{ color: "var(--muted)", paddingBottom: 5 }}>สำเร็จ {claimed} จาก {issued} ใบ</span>
+        </div>
+        <div style={{ height: 10, overflow: "hidden", borderRadius: 99, background: "#CDE4F1", marginTop: 18 }}>
+          <div style={{ height: "100%", width: `${rate}%`, minWidth: rate > 0 ? 10 : 0, borderRadius: 99, background: "var(--brand)" }} />
+        </div>
+      </section>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <p className="hint" style={{ textAlign: "left", marginBottom: 10 }}>รางวัลที่จ่ายวันนี้</p>
-        {d.rewards_given.length === 0 ? (
-          <p className="hint" style={{ textAlign: "left" }}>ยังไม่มี</p>
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginTop: 14 }}>
+        <div className="card" style={{ padding: 18 }}>
+          <span className="hint" style={{ display: "block", textAlign: "left" }}>QR ที่ออก</span>
+          <strong style={{ display: "block", fontSize: 34, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>{issued}</strong>
+        </div>
+        <div className="card" style={{ padding: 18, background: "var(--ok-bg)", borderColor: "#CDE3CB" }}>
+          <span className="hint" style={{ display: "block", textAlign: "left", color: "var(--ok)" }}>สแกนสำเร็จ</span>
+          <strong style={{ display: "block", fontSize: 34, marginTop: 4, color: "var(--ok)", fontVariantNumeric: "tabular-nums" }}>{claimed}</strong>
+        </div>
+      </section>
+
+      <section className="card" style={{ marginTop: 14, borderColor: unclaimed > 0 ? "#E8C98D" : "var(--line)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+          <div>
+            <p style={{ margin: 0, fontWeight: 600 }}>ออกแล้วไม่มีคนสแกน</p>
+            <p className="hint" style={{ textAlign: "left", marginTop: 3 }}>ดูว่าได้ยื่น QR ให้ลูกค้าทุกบิลหรือไม่</p>
+          </div>
+          <strong style={{ fontSize: 34, color: unclaimed > 0 ? "var(--warn)" : "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{unclaimed}</strong>
+        </div>
+      </section>
+
+      <section className="card" style={{ marginTop: 14 }}>
+        <p style={{ margin: "0 0 8px", fontWeight: 600 }}>🎁 รางวัลที่จ่ายวันนี้</p>
+        {rewards.length === 0 ? (
+          <p className="hint" style={{ textAlign: "left" }}>ยังไม่มีการจ่ายรางวัลในกะนี้</p>
         ) : (
           <div className="rows">
-            {d.rewards_given.map((r) => (
-              <div className="row" key={r.name}><span>{r.name}</span><b>{r.n}</b></div>
+            {rewards.map((reward) => (
+              <div className="row" key={reward.name}><span>{reward.name}</span><b>{reward.n}</b></div>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
       <div className="grow" />
-      <Link href="/staff" className="btn" style={{ textDecoration: "none" }}>กลับหน้าหลัก</Link>
+      <Link href="/staff" className="btn" style={{ textDecoration: "none", marginTop: 18 }}>กลับหน้าหลัก</Link>
     </div>
   );
 }

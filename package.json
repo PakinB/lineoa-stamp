@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "node scripts/psql.mjs -f db/migrations/0001_init.sql -f db/migrations/0002_functions.sql -f db/migrations/0004_staff_and_admin.sql -f db/migrations/0005_daily_stats_and_reward_slots.sql",
+    "db:migrate": "node scripts/psql.mjs -f db/migrations/0001_init.sql -f db/migrations/0002_functions.sql -f db/migrations/0003_api.sql -f db/migrations/0004_staff_and_admin.sql -f db/migrations/0005_daily_stats_and_reward_slots.sql -f db/migrations/0006_daily_line_scan_report.sql",
     "db:seed": "node scripts/psql.mjs -f db/seed.sql",
     "db:reset": "node scripts/psql.mjs -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' && npm run db:migrate && npm run db:seed",
     "db:psql": "node scripts/psql.mjs",

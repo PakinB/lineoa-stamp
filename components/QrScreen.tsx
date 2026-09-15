@@ -54,6 +54,7 @@ export default function QrScreen({ mode }: { mode: Mode }) {
   const [code, setCode] = useState<string>();
   const [left, setLeft] = useState(0);
   const [result, setResult] = useState<Status | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const deadline = useRef(0);
 
   const issue = useCallback(async () => {
@@ -89,7 +90,28 @@ export default function QrScreen({ mode }: { mode: Mode }) {
     }
   }, [cfg.issue]);
 
-  useEffect(() => { issue(); }, [issue]);
+  // Layout อาจถูกเก็บใน App Router cache ได้ แต่ QR ต้องห้ามออกก่อน API
+  // ยืนยัน session ที่ runtime ของ Worker ก่อนทุกครั้ง
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/staff/session", { cache: "no-store" });
+        if (!res.ok) {
+          window.location.replace(`/staff/login?next=${encodeURIComponent(window.location.pathname)}`);
+          return;
+        }
+        if (active) setSessionChecked(true);
+      } catch {
+        if (active) setPhase("error");
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (sessionChecked) issue();
+  }, [sessionChecked, issue]);
 
   // ถามสถานะทุก 2 วินาที — พอที่สเกลนี้ ไม่ต้องใช้ websocket
   useEffect(() => {

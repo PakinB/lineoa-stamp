@@ -61,12 +61,13 @@ function LoginForm() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.ok) {
-        if (nextUrl) {
-          router.replace(nextUrl);
-        } else if (data.role === "owner") {
-          router.replace("/admin");
-        } else {
-          router.replace("/staff");
+        // ป้องกัน open redirect และบังคับให้ router ขอ RSC ใหม่หลัง cookie ถูกตั้งแล้ว
+        const destination = nextUrl?.startsWith("/") && !nextUrl.startsWith("//")
+          ? nextUrl
+          : data.role === "owner" ? "/admin" : "/staff";
+        router.refresh();
+        if (destination) {
+          router.replace(destination);
         }
         return;
       }

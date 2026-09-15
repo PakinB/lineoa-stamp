@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { sql } from "@/lib/db";
-import { loginWithPin, loginWithStaffPin } from "@/lib/auth/staff";
+import { loginWithStaffPin } from "@/lib/auth/staff";
 import { SESSION_COOKIE } from "@/lib/auth/session";
 import { json, handler } from "@/lib/http";
 
@@ -13,15 +13,14 @@ export async function GET() {
   });
 }
 
-/** เข้ากะด้วยการเลือกชื่อ + PIN 6 หลัก (หรือ PIN fallback) */
+/** เข้ากะด้วยการเลือกชื่อ + PIN 6 หลักเท่านั้น */
 export async function POST(req: Request) {
   return handler(async () => {
     const body = (await req.json()) as { staff_id?: string; pin?: string };
+    if (!body.staff_id) return json({ ok: false, reason: "staff_id_required" }, 400);
     const pin = body.pin ?? "";
 
-    const { token, staff } = body.staff_id
-      ? await loginWithStaffPin(body.staff_id, pin)
-      : await loginWithPin(pin);
+    const { token, staff } = await loginWithStaffPin(body.staff_id, pin);
 
     (await cookies()).set(SESSION_COOKIE, token, {
       httpOnly: true,
@@ -33,4 +32,3 @@ export async function POST(req: Request) {
     return json({ ok: true, name: staff.name, role: staff.role, branch_id: staff.branch_id });
   });
 }
-

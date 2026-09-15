@@ -55,11 +55,6 @@ export async function checkPin(pin: string, stored: string): Promise<boolean> {
   return sameBytes(new Uint8Array(bits), unhex(want));
 }
 
-interface StaffRow {
-  id: string; branch_id: string | null; name: string;
-  role: "staff" | "manager" | "owner"; pin_hash: string;
-}
-
 export interface StaffAuthResult {
   token: string;
   staff: {
@@ -132,29 +127,6 @@ export async function loginWithStaffPin(staffId: string, pin: string): Promise<S
     token: await signSession(sess),
     staff: { id: info.id, name: info.name, role: info.role, branch_id: info.branch_id },
   };
-}
-
-/**
- * ล็อกอินด้วย PIN อย่างเดียว (คงไว้สำหรับ backward compatibility)
- */
-export async function loginWithPin(pin: string): Promise<{ token: string; staff: StaffRow }> {
-  if (!/^\d{6}$/.test(pin)) throw new HttpError("invalid_pin", 401);
-
-  const rows = await sql<StaffRow[]>`
-    SELECT id, branch_id, name, role, pin_hash
-      FROM staff_users WHERE revoked_at IS NULL`;
-
-  for (const s of rows) {
-    if (await checkPin(pin, s.pin_hash)) {
-      const hours = 14;
-      const sess: StaffSession = {
-        sid: s.id, bid: s.branch_id, role: s.role,
-        exp: Math.floor(Date.now() / 1000) + hours * 3600,
-      };
-      return { token: await signSession(sess), staff: s };
-    }
-  }
-  throw new HttpError("invalid_pin", 401);
 }
 
 export async function requireStaff(minRole: "staff" | "manager" | "owner" = "staff") {

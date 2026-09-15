@@ -12,6 +12,7 @@ interface Stats {
   tokens_today: number;
   tokens_used: number;
   daily_stats: DailyStatItem[];
+  daily_line_scans: DailyLineScanItem[];
   recent_activity: {
     id: number;
     slot_no: number;
@@ -20,6 +21,13 @@ interface Stats {
     branch_name: string;
     created_at: string;
   }[];
+}
+
+export interface DailyLineScanItem {
+  date: string;
+  date_th: string;
+  line_name: string;
+  qr_scans: number;
 }
 
 export default async function AdminDashboard() {
@@ -119,7 +127,10 @@ export default async function AdminDashboard() {
       </div>
 
       {/* สรุปรายวัน + Export Excel */}
-      <DailyQrSummary dailyStats={d.daily_stats || []} />
+      <DailyQrSummary
+        dailyStats={d.daily_stats || []}
+        dailyLineScans={d.daily_line_scans || []}
+      />
 
       {/* สถิติสะสม */}
       <div className="card">
