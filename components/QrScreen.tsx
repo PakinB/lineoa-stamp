@@ -29,14 +29,6 @@ interface Status {
   entitlement_id?: string | null;
 }
 
-/**
- * จำนวนดวงของ QR โปรโมชั่น
- *
- * ฝั่งเซิร์ฟเวอร์จำกัดไว้ 1–10 อยู่แล้ว ค่านี้เป็นแค่ค่าที่ปุ่มส่งไป
- * ถ้าจะเปลี่ยนจำนวนถาวร แก้ที่ app_settings.promo_points แล้วอ่านมาแสดงแทน
- */
-const PROMO_POINTS = 3;
-
 const CFG = {
   stamp: {
     title: "สะสมแต้ม",
@@ -50,7 +42,7 @@ const CFG = {
     issue: "/api/staff/tokens",
     status: (c: string) => `/api/staff/tokens/${c}`,
     isDone: (s: Status) => !!s.claimed,
-    prompt: "ให้ลูกค้าสแกนเพื่อรับ 3 ดวงรวด",
+    prompt: "ให้ลูกค้าสแกนเพื่อรับหลายดวงรวดเดียว",
   },
   reward: {
     title: "รับรางวัล",
@@ -70,6 +62,7 @@ export default function QrScreen({ mode }: { mode: Mode }) {
   const [code, setCode] = useState<string>();
   const [left, setLeft] = useState(0);
   const [result, setResult] = useState<Status | null>(null);
+  const [points, setPoints] = useState(1);
   const [sessionChecked, setSessionChecked] = useState(false);
   const deadline = useRef(0);
 
@@ -84,10 +77,13 @@ export default function QrScreen({ mode }: { mode: Mode }) {
       const res = await fetch(cfg.issue, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(mode === "promo" ? { points: PROMO_POINTS } : {}),
+        body: JSON.stringify(mode === "promo" ? { promo: true } : {}),
       });
       if (!res.ok) { setPhase("error"); return; }
-      const d = (await res.json()) as { code: string; url: string; expires_at: string };
+      const d = (await res.json()) as {
+        code: string; url: string; expires_at: string; points: number;
+      };
+      setPoints(d.points ?? 1);
 
       // วาด QR ให้เสร็จก่อน แล้วค่อยเปลี่ยนสถานะพร้อมกันทีเดียว
       // ถ้าตั้งเวลาหมดอายุก่อนวาดเสร็จ จะมีช่วงที่หน้าจอไม่รู้ว่าจะแสดงอะไร
@@ -169,7 +165,7 @@ export default function QrScreen({ mode }: { mode: Mode }) {
             <div className="tick" aria-hidden>✓</div>
             {mode === "promo" ? (
               <>
-                <p className="big">ได้ {PROMO_POINTS} ดวง</p>
+                <p className="big">ได้ {points} ดวง</p>
                 <p className="hint">
                   {result.customer_name ?? "ลูกค้า"} · ล่าสุดดวงที่ {result.slot_no}
                 </p>
@@ -225,7 +221,7 @@ export default function QrScreen({ mode }: { mode: Mode }) {
           <>
             {mode === "promo" && (
               <p className="hint" style={{ color: "var(--stamp)", fontWeight: 600 }}>
-                ⚠ ใบนี้ให้ {PROMO_POINTS} ดวง — ออกเมื่อลูกค้าทำเงื่อนไขครบแล้วเท่านั้น
+                ⚠ ใบนี้ให้ {points} ดวง — ออกเมื่อลูกค้าทำเงื่อนไขครบแล้วเท่านั้น
               </p>
             )}
             <p className="hint">{cfg.prompt}</p>

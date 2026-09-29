@@ -23,6 +23,7 @@ export default function SettingsManagement() {
   const [tokenTtl, setTokenTtl] = useState("10");
   const [redeemTtl, setRedeemTtl] = useState("5");
   const [undoMinutes, setUndoMinutes] = useState("10");
+  const [promoPoints, setPromoPoints] = useState("3");
 
   async function loadData() {
     try {
@@ -40,6 +41,7 @@ export default function SettingsManagement() {
         if (s.token_ttl_minutes) setTokenTtl(String(s.token_ttl_minutes.value));
         if (s.redeem_token_ttl_minutes) setRedeemTtl(String(s.redeem_token_ttl_minutes.value));
         if (s.redemption_undo_minutes) setUndoMinutes(String(s.redemption_undo_minutes.value));
+        if (s.promo_points) setPromoPoints(String(s.promo_points.value));
       }
     } catch {
       setErr("โหลดการตั้งค่าระบบไม่สำเร็จ");
@@ -92,6 +94,7 @@ export default function SettingsManagement() {
     await saveSetting("token_ttl_minutes", parseInt(tokenTtl, 10), "อายุ QR สะสม");
     await saveSetting("redeem_token_ttl_minutes", parseInt(redeemTtl, 10), "อายุ QR รางวัล");
     await saveSetting("redemption_undo_minutes", parseInt(undoMinutes, 10), "เวลาคืนสิทธิ์");
+    await saveSetting("promo_points", parseInt(promoPoints, 10), "จำนวนดวงของ QR โปรโมชั่น");
   }
 
   return (
@@ -219,6 +222,22 @@ export default function SettingsManagement() {
                   onChange={(e) => setTokenTtl(e.target.value)}
                   required
                 />
+              </div>
+
+              <div className="form-group">
+                <label>QR โปรโมชั่น ให้กี่ดวงต่อการสแกน</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  className="input-text"
+                  value={promoPoints}
+                  onChange={(e) => setPromoPoints(e.target.value)}
+                  required
+                />
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                  ปุ่มโปรโมชั่นในหน้าพนักงานจะเปลี่ยนตามค่านี้ทันที ไม่ต้อง deploy ใหม่
+                </span>
               </div>
 
               <div className="form-group">

@@ -6,10 +6,19 @@ import LogoutButton from "@/components/LogoutButton";
 /** หน้าหลัก — สองปุ่มใหญ่ที่พนักงานกดทั้งวัน ไม่มีอย่างอื่นมาแย่งความสนใจ */
 export default async function Home() {
   const sess = await requireStaff();
-  const [me] = await sql<{ name: string; branch: string | null }[]>`
-    SELECT s.name, b.name AS branch
+
+  // หนึ่งคำขอ = หนึ่งคำสั่ง SQL (ดู lib/db.ts) จึงดึงชื่อพนักงานกับค่าตั้งค่า
+  // มาในคำสั่งเดียว แยกเป็นสองคำสั่งแล้วจะค้างแบบสุ่มบน Cloudflare Workers
+  const [me] = await sql<{
+    name: string; branch: string | null; promo_points: number;
+  }[]>`
+    SELECT s.name,
+           b.name AS branch,
+           COALESCE((SELECT NULLIF(value, 'null'::jsonb)::int
+                       FROM app_settings WHERE key = 'promo_points'), 3) AS promo_points
       FROM staff_users s LEFT JOIN branches b ON b.id = s.branch_id
      WHERE s.id = ${sess.sid}`;
+  const promoPoints = me?.promo_points ?? 3;
 
   return (
     <div className="screen">
@@ -26,7 +35,7 @@ export default async function Home() {
           ออก QR สะสมแต้ม
         </Link>
         <Link href="/staff/promo" className="btn promo" style={{ textDecoration: "none" }}>
-          โปรโมชั่น — ปั๊ม 3 ดวง
+          โปรโมชั่น — ปั๊ม {promoPoints} ดวง
         </Link>
         <Link href="/staff/reward" className="btn ghost" style={{ textDecoration: "none" }}>
           ลูกค้ามารับรางวัล
