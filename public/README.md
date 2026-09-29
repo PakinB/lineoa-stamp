@@ -2,8 +2,10 @@
 
 ```
 brand/
-  stampbg.png         ต้นฉบับบัตรสะสม 1537x1023 (เก็บอ้างอิง ไม่ได้ใช้บนเว็บ)
-  stampbg.webp        ที่ใช้จริง 1100px 128 KB
+  stampbgnew1.jpg     ต้นฉบับบัตรสะสมที่ใช้อยู่ 960x640
+  stampbgnew1.webp    ที่ใช้จริง 97 KB
+  stampbg.png         บัตรใบเก่า 1537x1023 (เก็บอ้างอิง ไม่ได้ใช้แล้ว)
+  stampbg.webp        บัตรใบเก่า
   stampcomplete.png   ต้นฉบับตราประทับ 1254x1254
   stampcomplete.webp  ที่ใช้จริง 400px 64 KB
 ```

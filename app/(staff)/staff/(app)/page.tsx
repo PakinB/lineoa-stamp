@@ -25,6 +25,9 @@ export default async function Home() {
         <Link href="/staff/stamp" className="btn" style={{ textDecoration: "none" }}>
           ออก QR สะสมแต้ม
         </Link>
+        <Link href="/staff/promo" className="btn promo" style={{ textDecoration: "none" }}>
+          โปรโมชั่น — ปั๊ม 3 ดวง
+        </Link>
         <Link href="/staff/reward" className="btn ghost" style={{ textDecoration: "none" }}>
           ลูกค้ามารับรางวัล
         </Link>

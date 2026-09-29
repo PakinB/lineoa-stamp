@@ -14,8 +14,8 @@ import type { CardState } from "@/lib/api-types";
  */
 
 // จุดกึ่งกลางของแต่ละช่องบนภาพการ์ด (เปอร์เซ็นต์)
-const COL = [13.6, 31.78, 49.9, 68.12, 86.3];
-const ROW = [56.94, 79.91];
+const COL = [13.59, 31.77, 49.9, 68.18, 86.46];
+const ROW = [56.48, 78.98];
 
 function spot(no: number) {
   const i = no - 1;
@@ -47,7 +47,7 @@ export default function StampCard({
       </div>
 
       <div className="lami">
-        <img className="bg" src="/brand/stampbg.webp" alt={`บัตรสะสม La-Mi ใบที่ ${card.card_no}`} />
+        <img className="bg" src="/brand/stampbgnew1.webp" alt={`บัตรสะสม La-Mi ใบที่ ${card.card_no}`} />
         {filled.map((s) => (
           <img
             key={s.no}

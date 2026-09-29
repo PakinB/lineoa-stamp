@@ -2,7 +2,7 @@
  * หน้าจอพนักงานใช้งานตอนมือเปียกและร้านเสียงดัง (§4)
  * ทุกอย่างจึงใหญ่ ตัดกันชัด และกดด้วยนิ้วโป้งมือเดียวได้
  */
-/* สีดูดจากไฟล์การ์ดจริงของร้าน public/brand/stampbg.png */
+/* สีดูดจากไฟล์การ์ดจริงของร้าน public/brand/stampbgnew1.jpg */
 :root {
   /*
    * บอกเบราว์เซอร์ว่าหน้านี้เป็นธีมสว่างอย่างเดียว
@@ -139,7 +139,7 @@ html, body {
 .lami {
   position: relative;
   width: 100%;
-  aspect-ratio: 1537 / 1023;
+  aspect-ratio: 960 / 640;
   border-radius: 12px;
   overflow: hidden;
 }
@@ -147,7 +147,7 @@ html, body {
 
 .lami .mark {
   position: absolute;
-  width: 13.6%;
+  width: 13.9%;
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   filter: drop-shadow(0 2px 5px rgba(0,0,0,.28));
@@ -243,3 +243,7 @@ html, body {
   box-shadow: 0 12px 32px rgba(0,0,0,.15);
 }
 
+
+/* ปุ่มโปรโมชั่น — แยกสีจากปุ่มปกติ กันพนักงานกดผิดเพราะให้ 3 ดวง */
+.btn.promo { background: var(--stamp); }
+.btn.promo:active { background: #A80100; }

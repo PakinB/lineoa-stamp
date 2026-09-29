@@ -16,17 +16,26 @@ import QRCode from "qrcode";
  * ตั้งแต่ยังไม่ได้ QR มาด้วยซ้ำ ทำให้หน้าจอแวบเป็น "QR หมดอายุ" ตอนเพิ่งกดออก
  */
 
-type Mode = "stamp" | "reward";
+type Mode = "stamp" | "reward" | "promo";
 type Phase = "loading" | "showing" | "expired" | "done" | "error";
 
 interface Status {
   claimed?: boolean;
+  points?: number;
   redeemed?: boolean;
   customer_name?: string | null;
   slot_no?: number | null;
   given?: string | null;
   entitlement_id?: string | null;
 }
+
+/**
+ * จำนวนดวงของ QR โปรโมชั่น
+ *
+ * ฝั่งเซิร์ฟเวอร์จำกัดไว้ 1–10 อยู่แล้ว ค่านี้เป็นแค่ค่าที่ปุ่มส่งไป
+ * ถ้าจะเปลี่ยนจำนวนถาวร แก้ที่ app_settings.promo_points แล้วอ่านมาแสดงแทน
+ */
+const PROMO_POINTS = 3;
 
 const CFG = {
   stamp: {
@@ -35,6 +44,13 @@ const CFG = {
     status: (c: string) => `/api/staff/tokens/${c}`,
     isDone: (s: Status) => !!s.claimed,
     prompt: "ให้ลูกค้าสแกนด้วยกล้องในแอป LINE",
+  },
+  promo: {
+    title: "โปรโมชั่น",
+    issue: "/api/staff/tokens",
+    status: (c: string) => `/api/staff/tokens/${c}`,
+    isDone: (s: Status) => !!s.claimed,
+    prompt: "ให้ลูกค้าสแกนเพื่อรับ 3 ดวงรวด",
   },
   reward: {
     title: "รับรางวัล",
@@ -68,7 +84,7 @@ export default function QrScreen({ mode }: { mode: Mode }) {
       const res = await fetch(cfg.issue, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: "{}",
+        body: JSON.stringify(mode === "promo" ? { points: PROMO_POINTS } : {}),
       });
       if (!res.ok) { setPhase("error"); return; }
       const d = (await res.json()) as { code: string; url: string; expires_at: string };
@@ -88,7 +104,7 @@ export default function QrScreen({ mode }: { mode: Mode }) {
     } catch {
       setPhase("error");
     }
-  }, [cfg.issue]);
+  }, [cfg.issue, mode]);
 
   // Layout อาจถูกเก็บใน App Router cache ได้ แต่ QR ต้องห้ามออกก่อน API
   // ยืนยัน session ที่ runtime ของ Worker ก่อนทุกครั้ง
@@ -151,7 +167,14 @@ export default function QrScreen({ mode }: { mode: Mode }) {
         <div className="grow center">
           <div className="card done" style={{ width: "100%" }}>
             <div className="tick" aria-hidden>✓</div>
-            {mode === "stamp" ? (
+            {mode === "promo" ? (
+              <>
+                <p className="big">ได้ {PROMO_POINTS} ดวง</p>
+                <p className="hint">
+                  {result.customer_name ?? "ลูกค้า"} · ล่าสุดดวงที่ {result.slot_no}
+                </p>
+              </>
+            ) : mode === "stamp" ? (
               <>
                 <p className="big">ได้ดวงที่ {result.slot_no}</p>
                 <p className="hint">{result.customer_name ?? "ลูกค้า"}</p>
@@ -200,6 +223,11 @@ export default function QrScreen({ mode }: { mode: Mode }) {
 
         {phase === "showing" && png && (
           <>
+            {mode === "promo" && (
+              <p className="hint" style={{ color: "var(--stamp)", fontWeight: 600 }}>
+                ⚠ ใบนี้ให้ {PROMO_POINTS} ดวง — ออกเมื่อลูกค้าทำเงื่อนไขครบแล้วเท่านั้น
+              </p>
+            )}
             <p className="hint">{cfg.prompt}</p>
             <div className="qr-wrap"><img src={png} alt="QR สำหรับให้ลูกค้าสแกน" /></div>
             <p className="countdown">หมดอายุใน {mmss}</p>

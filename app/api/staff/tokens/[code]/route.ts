@@ -13,8 +13,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ code: s
     await requireStaff();
     const { code } = await params;
 
-    const rows = await sql<{ status: string; name: string | null; slot: number | null }[]>`
+    const rows = await sql<{
+      status: string; name: string | null; slot: number | null; points: number;
+    }[]>`
       SELECT t.status,
+             t.points,
              c.display_name AS name,
              l.slot_no      AS slot
         FROM earn_tokens t
@@ -30,6 +33,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ code: s
       expired: r.status === "expired",
       customer_name: r.name,
       slot_no: r.slot,
+      points: r.points,
     });
   });
 }
