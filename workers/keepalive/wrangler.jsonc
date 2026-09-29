@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "lami-keepalive",
+  "main": "index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // วันละครั้ง 03:00 UTC = 10:00 น. บ้านเรา
+  // Supabase ชั้นฟรีหยุดโปรเจกต์เมื่อไม่มีการใช้งานราวหนึ่งสัปดาห์
+  // แตะวันละครั้งจึงเหลือระยะห่างเผื่อไว้มาก แม้พลาดไปหลายวันก็ยังไม่หยุด
+  "triggers": { "crons": ["0 3 * * *"] },
+
+  // ต่อฐานข้อมูลตรงผ่าน Hyperdrive ตัวเดียวกับแอปหลัก
+  // ไม่เรียกผ่าน URL ของแอปหลัก เพราะ Worker เรียก Worker บน workers.dev
+  // ด้วยกันไม่ได้ (error 1042) และการแตะฐานข้อมูลคือเป้าหมายจริงอยู่แล้ว
+  "hyperdrive": [
+    { "binding": "HYPERDRIVE", "id": "c4b4122731d24b8f85617e14ff8b0974" }
+  ],
+
+  "observability": { "enabled": true }
+}
