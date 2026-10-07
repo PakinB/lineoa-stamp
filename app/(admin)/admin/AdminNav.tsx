@@ -10,6 +10,7 @@ export default function AdminNav() {
     { href: "/admin", label: "📊 ภาพรวม" },
     { href: "/admin/staff", label: "👥 จัดการพนักงาน" },
     { href: "/admin/rewards", label: "🎁 ของรางวัล" },
+    { href: "/admin/promos", label: "🎉 โปรโมชั่น" },
     { href: "/admin/settings", label: "⚙️ ตั้งค่าระบบ" },
   ];
 

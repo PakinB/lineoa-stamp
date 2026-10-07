@@ -7,18 +7,24 @@ import LogoutButton from "@/components/LogoutButton";
 export default async function Home() {
   const sess = await requireStaff();
 
-  // หนึ่งคำขอ = หนึ่งคำสั่ง SQL (ดู lib/db.ts) จึงดึงชื่อพนักงานกับค่าตั้งค่า
+  // หนึ่งคำขอ = หนึ่งคำสั่ง SQL (ดู lib/db.ts) จึงดึงชื่อพนักงานกับสรุปโปรโมชั่น
   // มาในคำสั่งเดียว แยกเป็นสองคำสั่งแล้วจะค้างแบบสุ่มบน Cloudflare Workers
   const [me] = await sql<{
-    name: string; branch: string | null; promo_points: number;
+    name: string; branch: string | null; promo_count: number; promo_first_points: number | null;
   }[]>`
     SELECT s.name,
            b.name AS branch,
-           COALESCE((SELECT NULLIF(value, 'null'::jsonb)::int
-                       FROM app_settings WHERE key = 'promo_points'), 3) AS promo_points
+           (SELECT count(*)::int FROM promo_campaigns WHERE is_active) AS promo_count,
+           (SELECT points FROM promo_campaigns WHERE is_active ORDER BY created_at DESC LIMIT 1) AS promo_first_points
       FROM staff_users s LEFT JOIN branches b ON b.id = s.branch_id
      WHERE s.id = ${sess.sid}`;
-  const promoPoints = me?.promo_points ?? 3;
+
+  // มีโปรฯ ตัวเดียวก็บอกจำนวนดวงบนปุ่มไปเลย พนักงานจะได้ไม่ต้องกดเข้าไปดู
+  const promoCount = me?.promo_count ?? 0;
+  const promoLabel =
+    promoCount === 0 ? "โปรโมชั่น — ยังไม่มีที่เปิดอยู่"
+      : promoCount === 1 ? `โปรโมชั่น — ปั๊ม ${me?.promo_first_points ?? 3} ดวง`
+        : `โปรโมชั่น — เลือกจาก ${promoCount} รายการ`;
 
   return (
     <div className="screen">
@@ -34,8 +40,12 @@ export default async function Home() {
         <Link href="/staff/stamp" className="btn" style={{ textDecoration: "none" }}>
           ออก QR สะสมแต้ม
         </Link>
-        <Link href="/staff/promo" className="btn promo" style={{ textDecoration: "none" }}>
-          โปรโมชั่น — ปั๊ม {promoPoints} ดวง
+        <Link
+          href="/staff/promo"
+          className="btn promo"
+          style={{ textDecoration: "none", opacity: promoCount === 0 ? 0.55 : 1 }}
+        >
+          {promoLabel}
         </Link>
         <Link href="/staff/reward" className="btn ghost" style={{ textDecoration: "none" }}>
           ลูกค้ามารับรางวัล

@@ -19,6 +19,7 @@ interface CardResponse extends CardState { ok: boolean; consented: boolean }
 const REASONS: Record<string, string> = {
   invalid_or_used: "QR นี้ถูกใช้ไปแล้ว ขอ QR ใบใหม่จากพนักงานได้เลย",
   already_claimed_by_you: "คุณสแกนใบนี้ไปแล้ว ดวงถูกเพิ่มให้เรียบร้อย",
+  promo_already_claimed: "คุณรับโปรโมชั่นนี้ไปแล้ว — โปรโมชั่นนี้ร่วมได้คนละหนึ่งครั้ง ดวงจากบิลปกติยังสะสมได้ตามเดิม",
   rate_limited: "วันนี้สะสมครบตามที่กำหนดแล้ว พรุ่งนี้สะสมต่อได้",
   invalid_or_expired: "QR หมดอายุแล้ว ขอให้พนักงานกดออกใบใหม่",
   entitlement_not_available: "สิทธิ์นี้ถูกใช้ไปแล้ว",

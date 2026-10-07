@@ -26,7 +26,8 @@ export interface CardSlot {
 }
 
 export interface StampCard {
-  id: string;
+  /** null = ใบเปล่าที่เซิร์ฟเวอร์วาดให้ลูกค้าใหม่ดู ยังไม่ได้สร้างแถวจริง (0012) */
+  id: string | null;
   /** ใบที่เท่าไหร่ของลูกค้าคนนี้ */
   card_no: number;
   size: number;
@@ -43,7 +44,7 @@ export interface Entitlement {
 }
 
 export interface CardState {
-  /** null = ลูกค้าใหม่ที่ยังไม่มีบัตร */
+  /** ตั้งแต่ 0012 เป็นต้นมาจะไม่เป็น null แล้ว — ลูกค้าใหม่ได้ใบเปล่าไปวาด */
   card: StampCard | null;
   /** รวมสิทธิ์จากบัตรใบเก่าที่ยังไม่ได้ใช้ด้วย — สแตมป์ไม่มีวันหมดอายุ */
   entitlements: Entitlement[];
@@ -55,6 +56,7 @@ export interface CardState {
 export type StampFailReason =
   | "invalid_or_used"        // รหัสไม่ถูกต้อง หรือถูกใช้ไปแล้ว
   | "already_claimed_by_you" // คุณเองเป็นคนสแกนไปแล้ว
+  | "promo_already_claimed"  // รับโปรโมชั่นรอบนี้ไปแล้ว — หนึ่งคนต่อหนึ่งรอบ
   | "rate_limited"           // เกินเพดานต่อวัน หรือยังไม่พ้นช่วงเว้น
   | "unauthenticated";
 

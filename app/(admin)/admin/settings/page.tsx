@@ -23,7 +23,7 @@ export default function SettingsManagement() {
   const [tokenTtl, setTokenTtl] = useState("10");
   const [redeemTtl, setRedeemTtl] = useState("5");
   const [undoMinutes, setUndoMinutes] = useState("10");
-  const [promoPoints, setPromoPoints] = useState("3");
+  const [reportWindow, setReportWindow] = useState("90");
 
   async function loadData() {
     try {
@@ -41,7 +41,7 @@ export default function SettingsManagement() {
         if (s.token_ttl_minutes) setTokenTtl(String(s.token_ttl_minutes.value));
         if (s.redeem_token_ttl_minutes) setRedeemTtl(String(s.redeem_token_ttl_minutes.value));
         if (s.redemption_undo_minutes) setUndoMinutes(String(s.redemption_undo_minutes.value));
-        if (s.promo_points) setPromoPoints(String(s.promo_points.value));
+        if (s.report_window_days) setReportWindow(String(s.report_window_days.value));
       }
     } catch {
       setErr("โหลดการตั้งค่าระบบไม่สำเร็จ");
@@ -94,7 +94,11 @@ export default function SettingsManagement() {
     await saveSetting("token_ttl_minutes", parseInt(tokenTtl, 10), "อายุ QR สะสม");
     await saveSetting("redeem_token_ttl_minutes", parseInt(redeemTtl, 10), "อายุ QR รางวัล");
     await saveSetting("redemption_undo_minutes", parseInt(undoMinutes, 10), "เวลาคืนสิทธิ์");
-    await saveSetting("promo_points", parseInt(promoPoints, 10), "จำนวนดวงของ QR โปรโมชั่น");
+  }
+
+  async function saveReportWindow(e: React.FormEvent) {
+    e.preventDefault();
+    await saveSetting("report_window_days", parseInt(reportWindow, 10), "ช่วงข้อมูลของรายงาน");
   }
 
   return (
@@ -225,22 +229,6 @@ export default function SettingsManagement() {
               </div>
 
               <div className="form-group">
-                <label>QR โปรโมชั่น ให้กี่ดวงต่อการสแกน</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  className="input-text"
-                  value={promoPoints}
-                  onChange={(e) => setPromoPoints(e.target.value)}
-                  required
-                />
-                <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                  ปุ่มโปรโมชั่นในหน้าพนักงานจะเปลี่ยนตามค่านี้ทันที ไม่ต้อง deploy ใหม่
-                </span>
-              </div>
-
-              <div className="form-group">
                 <label>อายุ QR รับของรางวัล (นาที)</label>
                 <input
                   type="number"
@@ -273,6 +261,43 @@ export default function SettingsManagement() {
                 disabled={savingKey !== null}
               >
                 บันทึกอายุ QR
+              </button>
+            </form>
+          </div>
+
+          {/* ช่วงข้อมูลของรายงาน */}
+          <div className="card" style={{ padding: 20 }}>
+            <h3 style={{ fontSize: 16, margin: "0 0 4px" }}>📑 ช่วงข้อมูลของรายงาน</h3>
+            <p className="hint" style={{ textAlign: "left", marginBottom: 14 }}>
+              ใช้กับรายงานที่แตกเป็นรายลูกค้าและรายสาขาต่อวัน ซึ่งโตเร็วตามจำนวนลูกค้า
+              ส่วนสรุปรายวันและสรุปรายสาขายังแสดงครบทุกวันตั้งแต่เปิดระบบเสมอ
+            </p>
+
+            <form onSubmit={saveReportWindow} className="stack" style={{ gap: 12 }}>
+              <div className="form-group">
+                <label>ย้อนหลังกี่วัน</label>
+                <input
+                  type="number"
+                  min="7"
+                  max="730"
+                  className="input-text"
+                  value={reportWindow}
+                  onChange={(e) => setReportWindow(e.target.value)}
+                  required
+                />
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                  เลขนี้ไม่ได้ลบอะไร ข้อมูลเก่ากว่านั้นยังอยู่ครบในระบบ
+                  แค่ไม่ถูกดึงมาแสดงเพื่อให้หน้าแอดมินเปิดเร็ว · ตั้งสูงจะโหลดช้าลง
+                </span>
+              </div>
+
+              <button
+                type="submit"
+                className="btn small"
+                style={{ width: "auto", alignSelf: "flex-end" }}
+                disabled={savingKey !== null}
+              >
+                บันทึกช่วงข้อมูล
               </button>
             </form>
           </div>

@@ -17,7 +17,15 @@ import QRCode from "qrcode";
  */
 
 type Mode = "stamp" | "reward" | "promo";
-type Phase = "loading" | "showing" | "expired" | "done" | "error";
+type Phase = "loading" | "picking" | "nopromo" | "showing" | "expired" | "done" | "error";
+
+/** โปรโมชั่นที่เปิดอยู่ — พนักงานเลือกก่อนออก QR */
+interface Promo {
+  id: string;
+  name: string;
+  points: number;
+  once_per_customer: boolean;
+}
 
 interface Status {
   claimed?: boolean;
@@ -63,10 +71,13 @@ export default function QrScreen({ mode }: { mode: Mode }) {
   const [left, setLeft] = useState(0);
   const [result, setResult] = useState<Status | null>(null);
   const [points, setPoints] = useState(1);
+  const [promos, setPromos] = useState<Promo[]>([]);
+  const [picked, setPicked] = useState<Promo | null>(null);
   const [sessionChecked, setSessionChecked] = useState(false);
   const deadline = useRef(0);
 
-  const issue = useCallback(async () => {
+  const issue = useCallback(async (promo?: Promo | null) => {
+    if (promo !== undefined) setPicked(promo ?? null);
     setPhase("loading");
     setPng(undefined);
     setCode(undefined);
@@ -74,10 +85,11 @@ export default function QrScreen({ mode }: { mode: Mode }) {
     deadline.current = 0;
 
     try {
+      const campaign = promo !== undefined ? promo : picked;
       const res = await fetch(cfg.issue, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(mode === "promo" ? { promo: true } : {}),
+        body: JSON.stringify(campaign ? { campaign_id: campaign.id } : {}),
       });
       if (!res.ok) { setPhase("error"); return; }
       const d = (await res.json()) as {
@@ -100,7 +112,7 @@ export default function QrScreen({ mode }: { mode: Mode }) {
     } catch {
       setPhase("error");
     }
-  }, [cfg.issue, mode]);
+  }, [cfg.issue, picked]);
 
   // Layout อาจถูกเก็บใน App Router cache ได้ แต่ QR ต้องห้ามออกก่อน API
   // ยืนยัน session ที่ runtime ของ Worker ก่อนทุกครั้ง
@@ -122,8 +134,27 @@ export default function QrScreen({ mode }: { mode: Mode }) {
   }, []);
 
   useEffect(() => {
-    if (sessionChecked) issue();
-  }, [sessionChecked, issue]);
+    if (!sessionChecked) return;
+    if (mode !== "promo") { issue(null); return; }
+
+    // มีตัวเดียวก็ข้ามขั้นเลือกไปเลย — วงจรหน้าร้านต้องจบใน 15 วินาที (§4)
+    (async () => {
+      try {
+        const res = await fetch("/api/staff/promos", { cache: "no-store" });
+        if (!res.ok) { setPhase("error"); return; }
+        const d = (await res.json()) as { campaigns: Promo[] };
+        const list = d.campaigns ?? [];
+        setPromos(list);
+        if (list.length === 0) setPhase("nopromo");
+        else if (list.length === 1) issue(list[0]);
+        else setPhase("picking");
+      } catch {
+        setPhase("error");
+      }
+    })();
+    // ตั้งใจให้ทำงานครั้งเดียวตอนเข้าหน้า ไม่ผูกกับ issue ที่เปลี่ยนตาม picked
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionChecked, mode]);
 
   // ถามสถานะทุก 2 วินาที — พอที่สเกลนี้ ไม่ต้องใช้ websocket
   useEffect(() => {
@@ -184,7 +215,12 @@ export default function QrScreen({ mode }: { mode: Mode }) {
           </div>
         </div>
         <div className="stack">
-          <button className="btn" onClick={issue}>ลูกค้าคนถัดไป</button>
+          <button className="btn" onClick={() => issue()}>ลูกค้าคนถัดไป</button>
+          {mode === "promo" && promos.length > 1 && (
+            <button className="btn ghost small" onClick={() => setPhase("picking")}>
+              เปลี่ยนโปรโมชั่น
+            </button>
+          )}
           {mode === "reward" && result.entitlement_id && (
             <UndoButton entitlementId={result.entitlement_id} />
           )}
@@ -202,6 +238,32 @@ export default function QrScreen({ mode }: { mode: Mode }) {
 
       <div className="grow center" style={{ gap: 18 }}>
         {phase === "loading" && <p className="hint">กำลังออก QR…</p>}
+
+        {phase === "picking" && (
+          <div className="stack" style={{ width: "100%", gap: 10 }}>
+            <p className="hint">เลือกโปรโมชั่นที่ลูกค้าทำเงื่อนไขครบแล้ว</p>
+            {promos.map((p) => (
+              <button
+                key={p.id}
+                className="btn promo"
+                style={{ display: "block", textAlign: "left", padding: "14px 16px" }}
+                onClick={() => issue(p)}
+              >
+                <span style={{ fontSize: 16, fontWeight: 700 }}>{p.name}</span>
+                <span style={{ display: "block", fontSize: 13, fontWeight: 400, opacity: 0.9 }}>
+                  ปั๊ม {p.points} ดวง · {p.once_per_customer ? "คนละครั้งเดียว" : "ร่วมซ้ำได้"}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {phase === "nopromo" && (
+          <>
+            <p className="big">ยังไม่มีโปรโมชั่นที่เปิดอยู่</p>
+            <p className="hint">ให้เจ้าของร้านสร้างที่หน้าระบบจัดการร้าน → โปรโมชั่น</p>
+          </>
+        )}
 
         {phase === "error" && (
           <>
@@ -221,21 +283,35 @@ export default function QrScreen({ mode }: { mode: Mode }) {
           <>
             {mode === "promo" && (
               <p className="hint" style={{ color: "var(--stamp)", fontWeight: 600 }}>
-                ⚠ ใบนี้ให้ {points} ดวง — ออกเมื่อลูกค้าทำเงื่อนไขครบแล้วเท่านั้น
+                ⚠ {picked?.name ?? "โปรโมชั่น"} · ใบนี้ให้ {points} ดวง —
+                ออกเมื่อลูกค้าทำเงื่อนไขครบแล้วเท่านั้น
               </p>
             )}
             <p className="hint">{cfg.prompt}</p>
+            {mode === "promo" && picked?.once_per_customer && (
+              <p className="hint" style={{ fontSize: 12 }}>
+                โปรฯ นี้ลูกค้าร่วมได้คนละครั้งเดียว คนที่เคยรับแล้วจะสแกนไม่ได้
+                และหน้าจอนี้จะไม่เปลี่ยน — ใบเดิมยังใช้กับลูกค้าคนอื่นได้
+              </p>
+            )}
             <div className="qr-wrap"><img src={png} alt="QR สำหรับให้ลูกค้าสแกน" /></div>
             <p className="countdown">หมดอายุใน {mmss}</p>
           </>
         )}
       </div>
 
-      <button className="btn" onClick={issue} disabled={phase === "loading"}>
-        {phase === "loading" ? "กำลังออก QR…"
-          : phase === "showing" ? "ออกใบใหม่"
-          : "ออก QR ใบใหม่"}
-      </button>
+      {phase !== "picking" && phase !== "nopromo" && (
+        <button className="btn" onClick={() => issue()} disabled={phase === "loading"}>
+          {phase === "loading" ? "กำลังออก QR…"
+            : phase === "showing" ? "ออกใบใหม่"
+            : "ออก QR ใบใหม่"}
+        </button>
+      )}
+      {phase === "showing" && mode === "promo" && promos.length > 1 && (
+        <button className="btn ghost small" onClick={() => setPhase("picking")}>
+          เปลี่ยนโปรโมชั่น
+        </button>
+      )}
     </div>
   );
 }
