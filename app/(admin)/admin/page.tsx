@@ -1,6 +1,10 @@
-import Link from "next/link";
 import { sql } from "@/lib/db";
-import DailyQrSummary, { DailyStatItem } from "@/components/DailyQrSummary";
+import DailyQrSummary, {
+  type DailyStatItem,
+  type DailyLineScanItem,
+  type BranchStatItem,
+  type BranchDailyItem,
+} from "@/components/DailyQrSummary";
 
 interface Stats {
   stamps_today: number;
@@ -13,6 +17,9 @@ interface Stats {
   tokens_used: number;
   daily_stats: DailyStatItem[];
   daily_line_scans: DailyLineScanItem[];
+  branch_stats: BranchStatItem[];
+  branch_daily: BranchDailyItem[];
+  report_window_days: number;
   recent_activity: {
     id: number;
     slot_no: number;
@@ -21,13 +28,6 @@ interface Stats {
     branch_name: string;
     created_at: string;
   }[];
-}
-
-export interface DailyLineScanItem {
-  date: string;
-  date_th: string;
-  line_name: string;
-  qr_scans: number;
 }
 
 export default async function AdminDashboard() {
@@ -47,40 +47,6 @@ export default async function AdminDashboard() {
 
   return (
     <div className="stack" style={{ gap: 16 }}>
-      {/* ทางลัดออก QR หน้าร้านสำหรับเจ้าของร้าน */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <Link
-          href="/staff/stamp"
-          className="btn"
-          style={{
-            textDecoration: "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            padding: "12px 14px",
-            fontSize: 15,
-          }}
-        >
-          <span>⚡</span> ออก QR สะสมแต้ม
-        </Link>
-        <Link
-          href="/staff/reward"
-          className="btn ghost"
-          style={{
-            textDecoration: "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            padding: "12px 14px",
-            fontSize: 15,
-          }}
-        >
-          <span>🎁</span> ออก QR รับรางวัล
-        </Link>
-      </div>
-
       {/* สถิติประจำวัน */}
       <div>
         <h2 style={{ fontSize: 16, margin: "0 0 10px", color: "var(--muted)" }}>วันนี้ (Today)</h2>
@@ -130,6 +96,15 @@ export default async function AdminDashboard() {
       <DailyQrSummary
         dailyStats={d.daily_stats || []}
         dailyLineScans={d.daily_line_scans || []}
+        branchStats={d.branch_stats || []}
+        branchDaily={d.branch_daily || []}
+        windowDays={d.report_window_days ?? 90}
+        overview={{
+          customers_all: d.customers_all,
+          stamps_all: d.stamps_all,
+          rewards_all: d.rewards_all,
+          rewards_pending: d.rewards_pending,
+        }}
       />
 
       {/* สถิติสะสม */}
