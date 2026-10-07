@@ -194,7 +194,29 @@ html, body {
 .pick button:active { border-color: var(--brand); background: #EAF4FA; }
 .pick .emo { font-size: 26px; }
 
-.wallet { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 10px 0 2px; }
+/*
+ * กล่องรางวัลที่แลกได้ — วางใต้บัตร
+ * ต้องอ่านออกว่าเป็นคนละเรื่องกับตัวบัตร จึงตีกรอบและใส่หัวข้อ
+ * ไม่ใช่ปล่อยชิปลอยต่อจากบัตรจนดูเหมือนส่วนหนึ่งของบัตร
+ */
+.wallet-box {
+  margin-top: 16px; padding: 14px 14px 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+}
+.wallet-title {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex-wrap: wrap;   /* จอแคบ ๆ ให้ป้ายจำนวนสิทธิ์ตกบรรทัดแทนดันกรอบจนล้น */
+  margin: 0 0 10px; font-size: 16px; font-weight: 700; color: var(--ink);
+}
+.wallet-count {
+  background: var(--ok-bg); color: var(--ok); border-radius: 999px;
+  padding: 2px 9px; font-size: 12px; font-weight: 700;
+}
+.wallet-note {
+  margin: 10px 0 0; text-align: center; font-size: 12px; color: var(--muted);
+}
+
+.wallet { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 0; }
 .chip-r {
   background: #EAF4FA; color: var(--brand-d); border: 1px solid #CDE4F1;
   border-radius: 999px; padding: 6px 13px; font-size: 13px; font-weight: 600;

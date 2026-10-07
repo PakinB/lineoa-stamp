@@ -65,12 +65,32 @@ export default function StampCard({
         </p>
       )}
 
+      {/* ลูกค้าใหม่ที่เพิ่งกดเข้ามาครั้งแรก ต้องรู้ว่าดวงแรกได้มายังไง */}
+      {card.filled === 0 && (
+        <p className="next-hint" style={{ paddingTop: 2, fontSize: 13 }}>
+          เริ่มสะสมได้เลย — สแกน QR จากพนักงานตอนจ่ายเงิน 1 บิลได้ 1 ดวง
+        </p>
+      )}
+
+      {/*
+        ก่อนหน้านี้เป็นชิป 🎁 ลอย ๆ ไม่มีหัวข้อ ลูกค้าจึงไม่รู้ว่านี่คือของที่
+        "แลกได้แล้ว" ไม่ใช่รายการของรางวัลทั้งหมดของร้าน — ใส่หัวข้อกำกับให้ชัด
+      */}
       {state.entitlements.length > 0 && (
-        <div className="wallet">
-          {state.entitlements.map((e) => (
-            <span className="chip-r" key={e.id}>🎁 {e.label}</span>
-          ))}
-        </div>
+        <section className="wallet-box">
+          <h2 className="wallet-title">
+            รางวัลที่คุณแลกได้
+            <span className="wallet-count">{state.entitlements.length} สิทธิ์</span>
+          </h2>
+
+          <div className="wallet">
+            {state.entitlements.map((e) => (
+              <span className="chip-r" key={e.id}>🎁 {e.label}</span>
+            ))}
+          </div>
+
+          <p className="wallet-note">แจ้งพนักงานที่หน้าเคาน์เตอร์เพื่อแลกของรางวัล · ไม่มีวันหมดอายุ</p>
+        </section>
       )}
     </>
   );
