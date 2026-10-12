@@ -23,7 +23,7 @@ interface Data {
   settings: {
     enabled: boolean; open: boolean; price_per_100g: number;
     min_grams: number; grams_step: number; eta_min: number; eta_max: number;
-    max_active: number | null; promptpay_set: boolean;
+    max_active: number | null; promptpay_set: boolean; cod_after_orders: number;
   };
   zones: Zone[]; items: Item[]; presets: Preset[]; discounts: Discount[];
   today: { orders: number; sales: number; cash: number; transfer: number; done: number; cancelled: number };
@@ -153,11 +153,13 @@ export default function DeliveryAdmin() {
           {([["delivery_price_per_100g", "ราคาต่อ 100 กรัม (ขีดละ)", s.price_per_100g],
              ["delivery_min_grams", "น้ำหนักขั้นต่ำเมื่อกำหนดเอง (กรัม)", s.min_grams],
              ["delivery_eta_min", "เวลาส่งโดยประมาณ ต่ำสุด (นาที)", s.eta_min],
-             ["delivery_eta_max", "เวลาส่งโดยประมาณ สูงสุด (นาที)", s.eta_max]] as const).map(([k, label, val]) => (
+             ["delivery_eta_max", "เวลาส่งโดยประมาณ สูงสุด (นาที)", s.eta_max],
+             ["delivery_cod_after_orders", "ต้องส่งสำเร็จกี่ครั้งก่อนจ่ายปลายทางได้ (0 = ให้ได้เลย)", s.cod_after_orders]] as const).map(([k, label, val]) => (
             <div className="form-group" key={k}>
               <label htmlFor={k}>{label}</label>
               <div style={{ display: "flex", gap: 8 }}>
-                <input id={k} type="number" className="input-text" defaultValue={val} min={1} />
+                <input id={k} type="number" className="input-text" defaultValue={val}
+                       min={k === "delivery_cod_after_orders" ? 0 : 1} />
                 <button className="btn small" style={{ width: "auto" }} disabled={busy}
                         onClick={() => {
                           const el = document.getElementById(k) as HTMLInputElement;

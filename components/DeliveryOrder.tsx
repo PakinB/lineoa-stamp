@@ -26,6 +26,7 @@ interface Zone { id: string; name: string; note: string | null; fee: number }
 interface Drink { id: string; name: string; price: number }
 interface Menu {
   ok: boolean; consented: boolean; enabled: boolean; open: boolean;
+  cod_allowed: boolean; delivered_count: number; cod_after_orders: number;
   eta: { min: number; max: number };
   price_per_100g: number; min_grams: number; grams_step: number;
   presets: Preset[]; zones: Zone[];
@@ -79,6 +80,7 @@ const REASONS: Record<string, string> = {
   slip_already_used: "สลิปใบนี้ถูกใช้ไปแล้ว ส่งใบที่โอนจริงของออเดอร์นี้นะ",
   image_too_big: "รูปใหญ่เกินไป ลองถ่ายใหม่",
   already_paid: "ออเดอร์นี้ยืนยันการชำระแล้ว",
+  cod_locked: "ครั้งแรกต้องโอนก่อนนะ ส่งถึงแล้วครั้งหน้าจ่ายปลายทางได้เลย",
 };
 
 const STEPS = [
@@ -145,6 +147,8 @@ export default function DeliveryOrder() {
     setGrams((g) => (d.presets.length ? d.presets[Math.min(1, d.presets.length - 1)].grams : g));
     setSpicy((s) => s || d.spicy[0] || "");
     setSoup((s) => s || d.soups[0] || "");
+    // ลูกค้าใหม่ยังจ่ายปลายทางไม่ได้ ตั้งเริ่มต้นเป็นโอนไปเลย จะได้ไม่ต้องมากดเปลี่ยน
+    if (!d.cod_allowed) setPay("transfer");
     return d;
   }, []);
 
@@ -673,18 +677,33 @@ export default function DeliveryOrder() {
             <p className="hint" style={{ textAlign: "left", marginBottom: 6 }}>วิธีชำระเงิน</p>
             <div className="stack" style={{ gap: 8 }}>
               {([["cod", "เงินสดปลายทาง", "จ่ายตอนรับของ"],
-                 ["transfer", "โอนพร้อมเพย์", "โอนแล้วแนบสลิปในหน้าถัดไป"]] as const).map(([k, t, s]) => (
-                <button key={k} onClick={() => setPay(k)} className="card"
-                        style={{
-                          padding: "11px 13px", textAlign: "left",
-                          border: `1.5px solid ${pay === k ? "var(--brand)" : "var(--line)"}`,
-                          background: pay === k ? "#F3F9FC" : "var(--surface)",
-                        }}>
-                  <b style={{ fontSize: 14.5 }}>{t}</b>
-                  <span style={{ display: "block", fontSize: 12, color: "var(--muted)" }}>{s}</span>
-                </button>
-              ))}
+                 ["transfer", "โอนพร้อมเพย์", "โอนแล้วแนบสลิปในหน้าถัดไป"]] as const).map(([k, t, sub]) => {
+                // ลูกค้าที่ยังไม่เคยรับของสำเร็จ เลือกปลายทางไม่ได้ — บอกเหตุผลไว้ด้วย
+                // ไม่ใช่ปล่อยให้กดแล้วเด้ง error ทีหลัง
+                const locked = k === "cod" && !menu.cod_allowed;
+                return (
+                  <button key={k} onClick={() => !locked && setPay(k)} disabled={locked}
+                          className="card"
+                          style={{
+                            padding: "11px 13px", textAlign: "left",
+                            opacity: locked ? 0.5 : 1,
+                            cursor: locked ? "default" : "pointer",
+                            border: `1.5px solid ${pay === k ? "var(--brand)" : "var(--line)"}`,
+                            background: pay === k ? "#F3F9FC" : "var(--surface)",
+                          }}>
+                    <b style={{ fontSize: 14.5 }}>{t}</b>
+                    <span style={{ display: "block", fontSize: 12, color: "var(--muted)" }}>
+                      {locked ? "ครั้งแรกยังใช้ไม่ได้" : sub}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
+            {!menu.cod_allowed && (
+              <p className="hint" style={{ textAlign: "left", fontSize: 12.5, marginTop: 8 }}>
+                สั่งครั้งแรกโอนก่อนนะ — <b>ส่งถึงแล้วครั้งหน้าจ่ายปลายทางได้เลย</b>
+              </p>
+            )}
           </div>
         </div>
 
