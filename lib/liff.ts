@@ -23,7 +23,13 @@ declare global {
 }
 
 const SDK = "https://static.line-scdn.net/liff/edge/2/sdk.js";
-let ready: Promise<void> | null = null;
+
+/**
+ * เก็บแยกตาม liffId เพราะมี LIFF app มากกว่าหนึ่งตัว
+ * ตัวแรกชี้ไปหน้าบัตรสะสม ตัวที่สองชี้ไปหน้าสั่งเดลิเวอรี่
+ * ต้อง init ด้วย id ของตัวที่เปิดอยู่จริง ไม่งั้น LINE จะไม่ยอม
+ */
+const ready = new Map<string, Promise<void>>();
 
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -36,18 +42,25 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
-/** เรียกได้หลายครั้ง ทำงานจริงครั้งเดียว */
-export function initLiff(): Promise<void> {
-  if (ready) return ready;
+/**
+ * เรียกได้หลายครั้ง ทำงานจริงครั้งเดียวต่อหนึ่ง liffId
+ *
+ * ส่ง id มาเองได้สำหรับหน้าที่ใช้ LIFF app คนละตัว — ไม่ส่งก็ใช้ตัวหลัก
+ * ถ้าตัวที่ส่งมายังไม่ได้ตั้งค่า จะถอยไปใช้ตัวหลักแทน เพื่อให้หน้ายังเปิดได้
+ * ระหว่างที่ยังไม่ได้สร้าง LIFF app ตัวที่สองในคอนโซล
+ */
+export function initLiff(preferredId?: string): Promise<void> {
+  const liffId = (preferredId?.trim() || process.env.NEXT_PUBLIC_LIFF_ID?.trim() || "");
 
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID?.trim();
   if (!liffId || liffId.startsWith("0000000000")) {
     // โหมดพัฒนา — ไม่ต้องผ่าน LINE
-    ready = Promise.resolve();
-    return ready;
+    return Promise.resolve();
   }
 
-  ready = (async () => {
+  const cached = ready.get(liffId);
+  if (cached) return cached;
+
+  const run = (async () => {
     await loadScript(SDK);
     const liff = globalThis.liff;
     if (!liff) throw new Error("ไม่พบ LIFF SDK");
@@ -63,7 +76,8 @@ export function initLiff(): Promise<void> {
     }
   })();
 
-  return ready;
+  ready.set(liffId, run);
+  return run;
 }
 
 /** token สำหรับแนบไปกับคำขอ ให้เซิร์ฟเวอร์เอาไปแลกตัวตนกับ LINE (§6) */

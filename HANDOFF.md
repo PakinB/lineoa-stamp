@@ -275,6 +275,7 @@ npm run staff:add -- "ชื่อ" 123456 staff main
 set -a && . ./.env.local && set +a
 export CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$DATABASE_URL"
 export NEXT_PUBLIC_LIFF_ID="2011511855-w6tMMnrD"
+export NEXT_PUBLIC_LIFF_ID_ORDER=""        # ← LIFF ตัวที่สอง (หน้าสั่งเดลิเวอรี่) ยังไม่ได้สร้าง
 export NEXT_PUBLIC_BASE_URL="https://lami-stamp.budphopakin-d18.workers.dev"
 npm run cf:build && npx wrangler deploy
 
@@ -443,6 +444,20 @@ push ขึ้น GitHub · เปลี่ยนได้จาก `/admin/deli
 วัดด้วย `python3 scripts/measure-card.py` แล้ว**ประกอบภาพตรวจก่อนเสมอ**
 
 ---
+
+## 6''. LIFF app — มีสองตัว
+
+| LIFF app | Endpoint URL | ใช้กับ | ตัวแปร |
+|---|---|---|---|
+| ตัวที่ 1 | `https://<โดเมน>/card` | บัตรสะสม · QR สแตมป์ · รับรางวัล | `NEXT_PUBLIC_LIFF_ID` |
+| ตัวที่ 2 | `https://<โดเมน>/order` | สั่งเดลิเวอรี่ | `NEXT_PUBLIC_LIFF_ID_ORDER` |
+
+**ต้องแยกเป็นสองตัวเพราะ Endpoint URL ของ LIFF app หนึ่งตัวมีได้ URL เดียว**
+
+`initLiff()` รับ id ต่อหน้าได้แล้ว · ถ้า `NEXT_PUBLIC_LIFF_ID_ORDER` ว่าง จะถอยไปใช้
+ตัวแรกเพื่อให้หน้ายังเปิดได้ แต่ลูกค้าจะเข้าหน้าสั่งผ่าน LINE ไม่ได้จนกว่าจะสร้างตัวที่สอง
+
+⚠️ **`NEXT_PUBLIC_*` ถูกฝังตอน build** สร้าง LIFF ตัวที่สองแล้วต้อง **build ใหม่** ถึงจะมีผล
 
 ## 6'. ลิงก์ที่ต้องใส่ในริชเมนู
 

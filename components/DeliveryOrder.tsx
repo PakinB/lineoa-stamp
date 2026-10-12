@@ -162,7 +162,9 @@ export default function DeliveryOrder() {
     started.current = true;
     (async () => {
       try {
-        await initLiff();
+        // หน้านี้เป็น LIFF app คนละตัวกับหน้าบัตรสะสม เพราะ endpoint คนละ URL
+        // ยังไม่ได้ตั้ง NEXT_PUBLIC_LIFF_ID_ORDER ก็ถอยไปใช้ตัวหลักให้หน้ายังเปิดได้
+        await initLiff(process.env.NEXT_PUBLIC_LIFF_ID_ORDER);
         const d = await loadMenu();
         if (!d) return;
         if (!d.consented) { setPhase("consent"); return; }
