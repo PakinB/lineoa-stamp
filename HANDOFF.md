@@ -50,8 +50,9 @@
 ```
 Production    https://lami-stamp.budphopakin-d18.workers.dev
 Keepalive     https://lami-keepalive.budphopakin-d18.workers.dev
-LIFF ID       2011511855-w6tMMnrD
-Channel ID    2011511855
+LIFF ID       2011511855-w6tMMnrD   (บัตรสะสม → /card)
+LIFF ID เดลิฯ  2011511855-yJtGI3tz   (สั่งเดลิเวอรี่ → /order)
+Channel ID    2011511855             LINE Login "La-mi บัตรสะสมแต้ม" · Published
 Hyperdrive    c4b4122731d24b8f85617e14ff8b0974
 เวอร์ชันล่าสุด  8e2ca9aa-4fa1-496d-8ccd-07657bec0c9c  (7 ต.ค. 2026)
 ```
@@ -100,7 +101,8 @@ report_window_days 90                                ← ช่วงข้อ�
 | ติดตั้งหน้าพนักงานเป็นแอป (PWA) | ✅ Android ขึ้นปุ่ม "ติดตั้ง" แล้ว · iPhone ยังไม่ได้ลอง |
 | ลูกค้าใหม่เห็นบัตรใบเปล่าตั้งแต่เปิดครั้งแรก (0012) | ✅ |
 | **เดลิเวอรี่** — สั่ง · คิวพนักงาน · ตรวจสลิป · ปั๊มสแตมป์ · หน้าแอดมิน | ✅ รอทดสอบหน้างาน |
-| LIFF app ตัวที่สอง + ปุ่มริชเมนูของเดลิเวอรี่ | ⬜ งานในคอนโซล |
+| LIFF app ตัวที่สองของเดลิเวอรี่ | ✅ |
+| ปุ่มริชเมนูชี้ไปหน้าสั่งเดลิเวอรี่ | ⬜ งานใน LINE OA Manager |
 | คิวอนุมัติรูปเดลิเวอรี่ Grab + LINE webhook | ⬜ |
 | **หน้านโยบายความเป็นส่วนตัว** `/privacy` `/terms` | ⬜ **บล็อกการ Publish LINE Login channel** |
 | งานตามเวลา (หมดอายุ QR · ตรวจยอดรายคืน) | ⬜ |
@@ -276,7 +278,7 @@ npm run staff:add -- "ชื่อ" 123456 staff main
 set -a && . ./.env.local && set +a
 export CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$DATABASE_URL"
 export NEXT_PUBLIC_LIFF_ID="2011511855-w6tMMnrD"
-export NEXT_PUBLIC_LIFF_ID_ORDER=""        # ← LIFF ตัวที่สอง (หน้าสั่งเดลิเวอรี่) ยังไม่ได้สร้าง
+export NEXT_PUBLIC_LIFF_ID_ORDER="2011511855-yJtGI3tz"
 export NEXT_PUBLIC_BASE_URL="https://lami-stamp.budphopakin-d18.workers.dev"
 npm run cf:build && npx wrangler deploy
 
@@ -453,6 +455,9 @@ push ขึ้น GitHub · เปลี่ยนได้จาก `/admin/deli
 | ตัวที่ 1 | `https://<โดเมน>/card` | บัตรสะสม · QR สแตมป์ · รับรางวัล | `NEXT_PUBLIC_LIFF_ID` |
 | ตัวที่ 2 | `https://<โดเมน>/order` | สั่งเดลิเวอรี่ | `NEXT_PUBLIC_LIFF_ID_ORDER` |
 
+สร้างแล้วทั้งคู่ · ตัวที่สอง `2011511855-yJtGI3tz` ตั้ง Add friend = On (Normal) ·
+ปิด Scan QR และ Module mode เพราะโค้ดไม่ได้เรียกใช้ (ใช้แค่ `init` `isLoggedIn` `login`)
+
 **ต้องแยกเป็นสองตัวเพราะ Endpoint URL ของ LIFF app หนึ่งตัวมีได้ URL เดียว**
 
 `initLiff()` รับ id ต่อหน้าได้แล้ว · ถ้า `NEXT_PUBLIC_LIFF_ID_ORDER` ว่าง จะถอยไปใช้
@@ -463,7 +468,8 @@ push ขึ้น GitHub · เปลี่ยนได้จาก `/admin/deli
 ## 6'. ลิงก์ที่ต้องใส่ในริชเมนู
 
 ```
-https://liff.line.me/2011511855-w6tMMnrD
+บัตรสะสม       https://liff.line.me/2011511855-w6tMMnrD
+สั่งเดลิเวอรี่    https://liff.line.me/2011511855-yJtGI3tz
 ```
 
 **ไม่ใช่** `https://lami-stamp.budphopakin-d18.workers.dev/card` — ถ้าใส่ URL เว็บตรง ๆ
