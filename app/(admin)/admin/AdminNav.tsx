@@ -11,6 +11,7 @@ export default function AdminNav() {
     { href: "/admin/staff", label: "👥 จัดการพนักงาน" },
     { href: "/admin/rewards", label: "🎁 ของรางวัล" },
     { href: "/admin/promos", label: "🎉 โปรโมชั่น" },
+    { href: "/admin/delivery", label: "🛵 เดลิเวอรี่" },
     { href: "/admin/settings", label: "⚙️ ตั้งค่าระบบ" },
   ];
 

@@ -10,11 +10,14 @@ export default async function Home() {
   // หนึ่งคำขอ = หนึ่งคำสั่ง SQL (ดู lib/db.ts) จึงดึงชื่อพนักงานกับสรุปโปรโมชั่น
   // มาในคำสั่งเดียว แยกเป็นสองคำสั่งแล้วจะค้างแบบสุ่มบน Cloudflare Workers
   const [me] = await sql<{
-    name: string; branch: string | null; promo_count: number; promo_first_points: number | null;
+    name: string; branch: string | null; promo_count: number; promo_first_points: number | null; delivery_open_count: number;
   }[]>`
     SELECT s.name,
            b.name AS branch,
            (SELECT count(*)::int FROM promo_campaigns WHERE is_active) AS promo_count,
+           (SELECT count(*)::int FROM delivery_orders
+             WHERE status IN ('placed','accepted','cooking','out')
+               AND (s.branch_id IS NULL OR branch_id = s.branch_id)) AS delivery_open_count,
            (SELECT points FROM promo_campaigns WHERE is_active ORDER BY created_at DESC LIMIT 1) AS promo_first_points
       FROM staff_users s LEFT JOIN branches b ON b.id = s.branch_id
      WHERE s.id = ${sess.sid}`;
@@ -49,6 +52,20 @@ export default async function Home() {
         </Link>
         <Link href="/staff/reward" className="btn ghost" style={{ textDecoration: "none" }}>
           ลูกค้ามารับรางวัล
+        </Link>
+        <Link
+          href="/staff/delivery"
+          className="btn"
+          style={{ textDecoration: "none", background: "var(--brand-d)",
+                   display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}
+        >
+          ออเดอร์เดลิเวอรี่
+          {(me?.delivery_open_count ?? 0) > 0 && (
+            <span style={{ background: "var(--stamp)", color: "#fff", borderRadius: 999,
+                           padding: "1px 10px", fontSize: 13, fontWeight: 700 }}>
+              {me.delivery_open_count}
+            </span>
+          )}
         </Link>
       </div>
 

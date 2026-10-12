@@ -222,6 +222,21 @@ html, body {
   border-radius: 999px; padding: 6px 13px; font-size: 13px; font-weight: 600;
 }
 
+/* ═══════════════════════════ เดลิเวอรี่ ═══════════════════════════ */
+/*
+ * ชิปเลือกตัวเลือก — ใช้ทั้งเลือกน้ำหนัก ความเผ็ด น้ำซุป และปุ่มเพิ่ม/ลดจำนวน
+ * สถานะเลือกอยู่สื่อด้วย data-on เพื่อให้เขียนในคอมโพเนนต์ได้ตรงไปตรงมา
+ */
+.chip-pick {
+  border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 999px; padding: 8px 14px; font-size: 14px; font-family: inherit;
+  min-width: 42px; line-height: 1.2; cursor: pointer;
+}
+.chip-pick[data-on="true"] {
+  border-color: var(--brand); background: #EAF4FA; color: var(--brand-d); font-weight: 600;
+}
+.chip-pick:disabled { opacity: .4; cursor: default; }
+
 /* ═══════════════════════════ หน้าแอดมิน (Admin) ═══════════════════════════ */
 .admin-tabs {
   display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 12px;
