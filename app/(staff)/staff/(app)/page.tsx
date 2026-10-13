@@ -59,13 +59,17 @@ export default async function Home() {
           style={{ textDecoration: "none", background: "var(--brand-d)",
                    display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}
         >
-          ออเดอร์เดลิเวอรี่
+          รับออเดอร์เดลิเวอรี่
           {(me?.delivery_open_count ?? 0) > 0 && (
             <span style={{ background: "var(--stamp)", color: "#fff", borderRadius: 999,
                            padding: "1px 10px", fontSize: 13, fontWeight: 700 }}>
               {me.delivery_open_count}
             </span>
           )}
+        </Link>
+        {/* คนขับใช้คนละหน้ากับเคาน์เตอร์ — งานคนละแบบ จอต่างกัน */}
+        <Link href="/staff/rider" className="btn ghost" style={{ textDecoration: "none" }}>
+          งานส่งของ (คนขับ)
         </Link>
       </div>
 
